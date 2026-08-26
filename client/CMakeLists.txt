@@ -6,7 +6,7 @@ set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # 设置编译器选项（可根据需要调整）
-set(CMAKE_PREFIX_PATH "${CMAKE_CURRENT_SOURCE_DIR}/deps/include")
+# set(CMAKE_PREFIX_PATH "${CMAKE_CURRENT_SOURCE_DIR}/deps/include")
 
 # 添加可执行文件
 add_executable(FSShareClient
@@ -23,7 +23,7 @@ target_include_directories(FSShareClient PRIVATE deps/include)
 # ============================================
 # 依赖库配置（根据实际使用的 websocket 库修改）
 # ============================================
-
+set(libwebsockets_DIR "${CMAKE_CURRENT_SOURCE_DIR}/deps/lib/cmake/libwebsockets")
 find_package(libwebsockets REQUIRED)   # 如果提供了 CMake 配置
 target_link_libraries(FSShareClient PRIVATE websockets)
 

@@ -10,8 +10,11 @@
 
 
 struct WebSocketClient::Impl {
-  Impl(SimpleThread* t) : net_thread_(t) {}
-    ~Impl();
+  Impl(SimpleThread* t);
+  ~Impl();
+
+  void Start();
+  void EvtLoop();
 
   WsClientConfig config;
   std::string url_;
@@ -74,8 +77,12 @@ bool WebSocketClient::ConnectUrl(const std::string& url) {
   info.ssl_cert_filepath = nullptr;
   info.ssl_private_key_filepath = nullptr;
 
+  static struct lws_protocols protocols[] = {
+    { "ws", WebSocketClient::Impl::LwsCallback, 0, 0 },
+    { NULL, NULL, 0, 0 }
+  };
   info.user = impl_.get();
-  info.protocols = nullptr;
+  info.protocols = protocols;
 
   impl_->context = lws_create_context(&info);
   if (!impl_->context) {
@@ -115,6 +122,9 @@ bool WebSocketClient::ConnectUrl(const std::string& url) {
     impl_->Log("lws_client_connect_via_info fail");
     impl_->TryReconnect();
   }
+
+  impl_->Start();
+
   return true;
 }
 
@@ -155,7 +165,26 @@ bool WebSocketClient::SendBinary(const uint8_t* data, size_t len) {
 }
 
 // Impl 实现
+WebSocketClient::Impl::Impl(SimpleThread* t)
+: net_thread_(t)
+{
+}
+
 WebSocketClient::Impl::~Impl() {
+}
+
+void WebSocketClient::Impl::Start()
+{
+  net_thread_->PostDelayedTask([this](){ EvtLoop(); }, 0);
+}
+
+void WebSocketClient::Impl::EvtLoop() {
+  if (exiting) 
+  {
+    return;
+  }
+  lws_service(context, 20);
+  net_thread_->PostDelayedTask([this](){ EvtLoop(); }, 0);
 }
 
 void WebSocketClient::Impl::SetState(WsClientState s) {

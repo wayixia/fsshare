@@ -12,7 +12,8 @@ int main() {
  
   while (!done) {
     std::cout << "Enter Command: ";
-    std::getline(std::cin, input);
+    std::cin >> std::ws;
+    auto& r = std::getline(std::cin, input);
  
     if (input == "quit") {
       done = true;
@@ -27,9 +28,9 @@ int main() {
         //std::getline(std::cin, url);
         url = "ws://localhost:8090/signalingserver";
         if (client.ConnectUrl(url)) {
-            std::cout << "Connecting to " << url << "..." << std::endl;
+            std::cout << "Connecting to " << url << "...";
         } else {
-            std::cout << "Failed to initiate connection." << std::endl;
+            std::cout << "Failed to initiate connection.";
         }
     } else if (input == "send") {
         std::string message;
