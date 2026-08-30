@@ -15,7 +15,8 @@ struct WebSocketClient::Impl {
 
   void Start();
   void EvtLoop();
-
+  std::vector<uint8_t> msg_buf;
+  uint8_t msg_opcode; // 记录第一条分片opcode
   WsClientConfig config;
   std::string url_;
   std::string host;
@@ -50,6 +51,8 @@ WebSocketClient::WebSocketClient(SimpleThread* net_thread)
   : impl_(std::make_unique<Impl>(net_thread))
   , net_thread_(net_thread) {
   impl_->outer = this;
+  
+  lws_set_log_level(LLL_ERR | LLL_WARN | LLL_NOTICE, nullptr);
 }
 
 WebSocketClient::~WebSocketClient() {
@@ -61,26 +64,40 @@ void WebSocketClient::SetConfig(const WsClientConfig& cfg) {
   impl_->config = cfg;
 }
 
+
 bool WebSocketClient::ConnectUrl(const std::string& url) {
+  net_thread_->PostTask([this,url]{
+    DoConnectUrl(url);
+  });
+  impl_->Start();
+}
+
+bool WebSocketClient::DoConnectUrl(const std::string& url) {
   //RTC_DCHECK_RUN_ON(net_thread_);
   if (!impl_->ParseUrl(url)) {
-    if(on_error) on_error(-100);
+    if(on_error) {
+      on_error(-100);
+    }
     return false;
   }
+  
   impl_->retry_counter = 0;
   impl_->exiting = false;
   impl_->SetState(WsClientState::kConnecting);
 
+  
+  static struct lws_protocols protocols[] = {
+    { "wss", WebSocketClient::Impl::LwsCallback, 0, 0 },
+    { NULL, NULL, 0, 0 }
+  };
+  
   lws_context_creation_info info{};
   info.port = -1;
   info.options = LWS_SERVER_OPTION_DO_SSL_GLOBAL_INIT;
   info.ssl_cert_filepath = nullptr;
   info.ssl_private_key_filepath = nullptr;
 
-  static struct lws_protocols protocols[] = {
-    { "ws", WebSocketClient::Impl::LwsCallback, 0, 0 },
-    { NULL, NULL, 0, 0 }
-  };
+
   info.user = impl_.get();
   info.protocols = protocols;
 
@@ -110,7 +127,7 @@ bool WebSocketClient::ConnectUrl(const std::string& url) {
   cci.origin = impl_->config.origin.c_str();
   cci.userdata = impl_.get();
   cci.opaque_user_data = impl_.get();
-  cci.protocol = nullptr;
+  cci.protocol = "wss";
   auto hdrs = impl_->build_custom_headers();
   std::vector<const char*> hdr_ptrs;
   for(auto& s : hdrs) hdr_ptrs.push_back(s.c_str());
@@ -123,7 +140,7 @@ bool WebSocketClient::ConnectUrl(const std::string& url) {
     impl_->TryReconnect();
   }
 
-  impl_->Start();
+
 
   return true;
 }
@@ -143,8 +160,9 @@ void WebSocketClient::Close() {
 }
 
 bool WebSocketClient::SendText(const std::string& text) {
-  //RTC_DCHECK_RUN_ON(net_thread_);
-  if(impl_->state != WsClientState::kOpen || !impl_->wsi) return false;
+  DCHECK_RUN_ON(net_thread_);
+  if(impl_->state != WsClientState::kOpen || !impl_->wsi)
+    return false;
   size_t buf_len = LWS_PRE + text.size();
   unsigned char* p = (unsigned char*)malloc(buf_len);
   memcpy(p + LWS_PRE, text.data(), text.size());
@@ -196,12 +214,13 @@ void WebSocketClient::Impl::SetState(WsClientState s) {
 }
 
 void WebSocketClient::Impl::Log(const char* fmt, ...) {
-  char buf[1024];
+  char buf[1024] = {0};
+  memset(buf, 0x00, sizeof(buf));
   va_list ap;
   va_start(ap,fmt);
   vsnprintf(buf,sizeof(buf),fmt,ap);
   va_end(ap);
-  std::cout << "[LibWSClient] " << buf << std::endl;
+  printf( "[LibWSClient] %s\n", buf );
 }
 
 bool WebSocketClient::Impl::ParseUrl(const std::string& url) {
@@ -210,26 +229,36 @@ bool WebSocketClient::Impl::ParseUrl(const std::string& url) {
   port = 0;
   size_t proto_end = 0;
   if(url.substr(0,5)=="ws://"){
-    proto_end =5; use_tls=false; port=80;
-  }else if(url.substr(0,6)=="wss://"){
-    proto_end=6; use_tls=true; port=443;
-  }else return false;
+    proto_end =5;
+    use_tls=false;
+    port=80;
+  } else if(url.substr(0,6)=="wss://") {
+    proto_end=6;
+    use_tls=true;
+    port=443;
+  } else {
+    return false;
+  }
 
   size_t host_start = proto_end;
   size_t path_pos = url.find('/', host_start);
   size_t port_pos = url.find(':', host_start);
-  if(path_pos == std::string::npos){
+  if(path_pos == std::string::npos) {
     path_pos = url.size(); path="/";
-  }else path = url.substr(path_pos);
+  } else {
+    path = url.substr(path_pos);
+  }
 
   if(port_pos != std::string::npos && port_pos < path_pos){
     host = url.substr(host_start, port_pos-host_start);
     std::string ps = url.substr(port_pos+1, path_pos-port_pos-1);
     port = atoi(ps.c_str());
-  }else{
+  } else {
     host = url.substr(host_start, path_pos-host_start);
   }
-  if(host.empty()) return false;
+  if(host.empty()) {
+    return false;
+  }
   Log("parse url tls=%d host=%s port=%d path=%s", use_tls, host.c_str(), port, path.c_str());
   return true;
 }
@@ -266,28 +295,57 @@ int WebSocketClient::Impl::LwsCallback(struct lws *wsi, enum lws_callback_reason
   auto* impl = (WebSocketClient::Impl*)user;
   switch (reason) {
   case LWS_CALLBACK_CLIENT_ESTABLISHED:
-    impl->Log("websocket open");
     impl->SetState(WsClientState::kOpen);
-    // libwebsockets 自动处理 ping/pong，不需要自己实现帧
+    ///impl->outer->SendText("{\"kind\":\"TextMessage\"}");
     break;
 
   case LWS_CALLBACK_CLIENT_RECEIVE: {
-
-
-    // lws回调内部245行替换
-    bool is_text = !!(impl->pending_write_flags & LWS_WRITE_TEXT);
-    //bool is_text = !!(lws_get_writable_pending(wsi) & LWS_WRITE_TEXT);
-    if(is_text){
-      std::string msg((char*)in, len);
-      impl->net_thread_->PostTask([impl,msg](){
-        if(impl->outer->on_text_msg) impl->outer->on_text_msg(msg);
-      });
-    }else{
-      std::vector<uint8_t> bin((uint8_t*)in, (uint8_t*)in+len);
-      impl->net_thread_->PostTask([impl, bin](){
-        if(impl->outer->on_binary_msg) impl->outer->on_binary_msg(bin.data(), bin.size());
-      });
+    uint8_t opcode = lws_get_opcode(wsi);
+    int is_first = lws_is_first_fragment(wsi);
+    int is_fin = lws_is_final_fragment(wsi);
+    // 第一条分片保存opcode，后续continuation(0x0)直接复用
+    if(is_first) {
+      impl->msg_opcode = opcode;
     }
+
+    // 追加payload
+    impl->msg_buf.insert(impl->msg_buf.end(),(uint8_t*)in, ((uint8_t*)in)+len);
+
+    if(is_fin) {
+      // 完整消息
+      if(impl->msg_opcode == 0x1) {
+        // TEXT消息
+        impl->net_thread_->PostTask([impl](){
+          if(impl->outer->on_text_msg) {
+            impl->outer->on_text_msg(
+              std::string((const char*)impl->msg_buf.data(), impl->msg_buf.size()));
+          }
+          impl->msg_buf.clear();
+        });
+      } else if(impl->msg_opcode == 0x2) {
+        // BINARY消息
+        impl->net_thread_->PostTask([impl](){
+          if(impl->outer->on_binary_msg) {
+            impl->outer->on_binary_msg(impl->msg_buf.data(), impl->msg_buf.size());
+          }
+          impl->msg_buf.clear();
+        });
+      }
+    }
+    // lws回调内部245行替换
+    //bool is_text = !!(impl->pending_write_flags & LWS_WRITE_TEXT);
+//    enum lws_write_protocol pktype = lws_get_packet_type(wsi) ;
+//    if( pktype == LWS_WRITE_TEXT ) {
+//      std::string msg((char*)in, len);
+//      impl->net_thread_->PostTask([impl,msg](){
+//        if(impl->outer->on_text_msg) impl->outer->on_text_msg(msg);
+//      });
+//    }else if(pktype == LWS_WRITE_BINARY) {
+//      std::vector<uint8_t> bin((uint8_t*)in, (uint8_t*)in+len);
+//      impl->net_thread_->PostTask([impl, bin](){
+//        if(impl->outer->on_binary_msg) impl->outer->on_binary_msg(bin.data(), bin.size());
+//      });
+//    }
     break;
   }
 
@@ -313,4 +371,13 @@ int WebSocketClient::Impl::LwsCallback(struct lws *wsi, enum lws_callback_reason
     break;
   }
   return 0;
+}
+
+
+void WebSocketClient::Initialize() {
+  lws_set_log_level(LLL_ERR | LLL_WARN | LLL_NOTICE, nullptr);
+}
+
+void WebSocketClient::Uninitialize() {
+  // nothing to do
 }

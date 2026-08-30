@@ -35,11 +35,17 @@ enum class WsClientState {
 */
 class WebSocketClient {
 public:
+  /** 初始化 */
+  static void Initialize();
+
+  /**  反初始化 */
+  static void Uninitialize();
+
+public:
   explicit WebSocketClient( SimpleThread* net_thread);
   ~WebSocketClient();
 
   void SetConfig(const WsClientConfig& cfg);
-
   bool ConnectUrl(const std::string& url); // ws:// wss://
   void Close();
 
@@ -52,6 +58,9 @@ public:
   std::function<void(const uint8_t*, size_t)> on_binary_msg;
   std::function<void(int err)> on_error;
 
+private:
+  bool DoConnectUrl(const std::string& url);
+  
 private:
   struct Impl;
   std::unique_ptr<Impl> impl_;

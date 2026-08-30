@@ -4,17 +4,47 @@
 #include "websocket_client.h"
 
 int main() {
-  bool done = false;
-  std::string input;
+  WebSocketClient::Initialize();
+
   SimpleThread net_thread("WebSocketNetThread");
+
   WebSocketClient client(&net_thread); // 传入 nullptr 或实际的 net_thread 指针
+  client.on_state_change = [&client](WsClientState state) {
+    const char* sstate = "unknown";
+    switch( state ) {
+      case WsClientState::kOpen:
+        sstate = "open";
+        
+        client.SendText("{\"kind\":\"TextMessage\"}");
+        break;
+      case WsClientState::kClosing:
+        sstate = "closing";
+        break;
+      case WsClientState::kConnecting:
+        sstate = "connecting";
+        break;
+      case WsClientState::kDisconnected:
+        sstate = "disconnected";
+        break;
+    } // end switch
+    std::cout << "[websocket] state => " << sstate << std::endl;
+  };
+  
+  client.on_text_msg = [](const std::string& msg){
+    std::cout << "[wsclient]text message ->" << msg << std::endl;
+  };
+  
+  client.on_error = []( int err ) {
+    
+  };
+  
+  
   net_thread.Start(); // 启动线程
- 
-  while (!done) {
-    std::cout << "Enter Command: ";
-    std::cin >> std::ws;
-    auto& r = std::getline(std::cin, input);
- 
+
+#if 0
+  std::string input;
+  while (std::getline(std::cin, input)) {
+
     if (input == "quit") {
       done = true;
     } else if (input == "help") {
@@ -28,9 +58,9 @@ int main() {
         //std::getline(std::cin, url);
         url = "ws://localhost:8090/signalingserver";
         if (client.ConnectUrl(url)) {
-            std::cout << "Connecting to " << url << "...";
+            std::cout << "Connecting to " << url << "..." << std::endl;
         } else {
-            std::cout << "Failed to initiate connection.";
+            std::cout << "Failed to initiate connection." << std::endl;
         }
     } else if (input == "send") {
         std::string message;
@@ -47,8 +77,24 @@ int main() {
     } else {
       std::cout << "Unrecognized Command" << std::endl;
     } 
-  } 
-
+  }
+#else
+  std::string url;
+  //std::cout << "Enter WebSocket URL (ws:// or wss://): ";
+  //std::getline(std::cin, url);
+  url = "ws://localhost:8090/signalingserver";
+  if (client.ConnectUrl(url)) {
+      std::cout << "Connecting to " << url << "..." << std::endl;
+  } else {
+      std::cout << "Failed to initiate connection." << std::endl;
+  }
+  
+  while(1) {
+    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+  }
+#endif
+  
+  WebSocketClient::Uninitialize();
   net_thread.Stop(); // 停止线程
  
   return 0;

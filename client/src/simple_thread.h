@@ -11,6 +11,9 @@
 #include <chrono>
 #include <future>
 #include <utility>
+#include <assert.h>
+
+#define DCHECK_RUN_ON(t) assert( SimpleThread::Current() == t );
 
 class SimpleThread {
 public:
