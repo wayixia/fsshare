@@ -140,13 +140,11 @@ bool WebSocketClient::DoConnectUrl(const std::string& url) {
     impl_->TryReconnect();
   }
 
-
-
   return true;
 }
 
 void WebSocketClient::Close() {
-  //RTC_DCHECK_RUN_ON(net_thread_);
+  DCHECK_RUN_ON(net_thread_);
   impl_->exiting = true;
   if (impl_->wsi) {
     lws_close_reason(impl_->wsi, LWS_CLOSE_STATUS_NORMAL, nullptr,0);
@@ -172,7 +170,7 @@ bool WebSocketClient::SendText(const std::string& text) {
 }
 
 bool WebSocketClient::SendBinary(const uint8_t* data, size_t len) {
-  //RTC_DCHECK_RUN_ON(net_thread_);
+  DCHECK_RUN_ON(net_thread_);
   if(impl_->state != WsClientState::kOpen || !impl_->wsi) return false;
   size_t buf_len = LWS_PRE + len;
   unsigned char* p = (unsigned char*)malloc(buf_len);

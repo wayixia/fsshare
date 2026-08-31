@@ -1,21 +1,21 @@
 
+#include "webrtc_signal_connection.h"
 #include <iostream>
 #include <string>
-#include "websocket_client.h"
 
 int main() {
   WebSocketClient::Initialize();
 
   SimpleThread net_thread("WebSocketNetThread");
 
-  WebSocketClient client(&net_thread); // 传入 nullptr 或实际的 net_thread 指针
+  WebRTCSignalConnection client(&net_thread); // 传入 nullptr 或实际的 net_thread 指针
   client.on_state_change = [&client](WsClientState state) {
     const char* sstate = "unknown";
     switch( state ) {
       case WsClientState::kOpen:
         sstate = "open";
-        
-        client.SendText("{\"kind\":\"TextMessage\"}");
+        client.IdentifySelf();
+        //client.SendText("{\"kind\":\"TextMessage\"}");
         break;
       case WsClientState::kClosing:
         sstate = "closing";
@@ -30,8 +30,9 @@ int main() {
     std::cout << "[websocket] state => " << sstate << std::endl;
   };
   
-  client.on_text_msg = [](const std::string& msg){
-    std::cout << "[wsclient]text message ->" << msg << std::endl;
+  client.on_text_msg = [&client](const std::string& msg){
+    //std::cout << "[wsclient]text message ->" << msg << std::endl;
+    client.HandleMessage(msg);
   };
   
   client.on_error = []( int err ) {

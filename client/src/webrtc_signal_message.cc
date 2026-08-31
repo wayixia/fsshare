@@ -175,15 +175,15 @@ bool ICECandidateContent::fromJson(const Json::Value& jv, std::string& err) {
 // -------- IdentifySelfContent --------
 Json::Value IdentifySelfContent::toJson() const {
     Json::Value jv;
-    jv["name"] = name;
+    jv["ID"] = ID;
     return jv;
 }
 bool IdentifySelfContent::fromJson(const Json::Value& jv, std::string& err) {
-    if (!jv.isMember("name")) {
+    if (!jv.isMember("ID")) {
         err = "missing field name";
         return false;
     }
-    name = jv["name"].asString();
+    ID = jv["ID"].asString();
     return true;
 }
 
@@ -235,7 +235,7 @@ bool Message::marshalContent(const BaseContent& payload, std::string& outErr) {
 Json::Value messageToJson(const Message& msg)
 {
     Json::Value root;
-    root["kind"]  = static_cast<int>(msg.kind);
+    root["kind"]  = messageTypeToString(msg.kind);
     root["reach"] = reachTypeToJsonValue(msg.reach);
     root["sender"] = msg.sender;
     root["peerID"] = msg.peerID;

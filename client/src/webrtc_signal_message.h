@@ -73,7 +73,7 @@ struct ICECandidateContent : public BaseContent {
 };
 
 struct IdentifySelfContent : public BaseContent {
-    std::string name;
+    std::string ID;
     Json::Value toJson() const override;
     bool fromJson(const Json::Value& jv, std::string& err) override;
 };
