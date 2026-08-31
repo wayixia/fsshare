@@ -70,6 +70,51 @@ std::string messageTypeToString(MessageType t) {
     }
 }
 
+bool messageTypeFromString(const std::string& s, MessageType& mtype, std::string& err ) {
+  err.clear();
+
+  if (s == "GetAllPeerIDs")
+  {
+      mtype = MessageType::GetAllPeerIDs;
+  }
+  else if (s == "TextMessage")
+  {
+      mtype = MessageType::TextMessage;
+  }
+  else if (s == "Disconnect")
+  {
+      mtype = MessageType::Disconnect;
+  }
+  else if (s == "Offer")
+  {
+      mtype = MessageType::Offer;
+  }
+  else if (s == "Answer")
+  {
+      mtype = MessageType::Answer;
+  }
+  else if (s == "ICECandidate")
+  {
+      mtype = MessageType::ICECandidate;
+  }
+  else if (s == "IdentifySelf")
+  {
+      mtype = MessageType::IdentifySelf;
+  }
+  else if (s == "DisconnectionNotification")
+  {
+      mtype = MessageType::DisconnectionNotification;
+  }
+  
+  else
+  {
+      err = "unknown MessageType string: " + s;
+      return false;
+  }
+  
+  return true;
+}
+
 // ========== 工厂函数 ==========
 std::unique_ptr<BaseContent> createContentByKind(MessageType kind) {
     switch (kind) {
@@ -175,15 +220,15 @@ bool ICECandidateContent::fromJson(const Json::Value& jv, std::string& err) {
 // -------- IdentifySelfContent --------
 Json::Value IdentifySelfContent::toJson() const {
     Json::Value jv;
-    jv["ID"] = ID;
+    jv["id"] = ID;
     return jv;
 }
 bool IdentifySelfContent::fromJson(const Json::Value& jv, std::string& err) {
-    if (!jv.isMember("ID")) {
+    if (!jv.isMember("id")) {
         err = "missing field name";
         return false;
     }
-    ID = jv["ID"].asString();
+    ID = jv["id"].asString();
     return true;
 }
 
@@ -245,22 +290,24 @@ Json::Value messageToJson(const Message& msg)
 
 bool jsonToMessage(const Json::Value& root, Message& outMsg, std::string& outErr)
 {
-    outErr.clear();
-    try
-    {
-        outMsg.kind = static_cast<MessageType>(root["kind"].asInt());
-        if (!jsonValueToReachType(root["reach"], outMsg.reach, outErr))
-        {
-            return false;
-        }
-        outMsg.sender = root["sender"].asString();
-        outMsg.peerID  = root["peerID"].asString();
-        outMsg.content = root["content"];
+  outErr.clear();
+  try
+  {
+    if( !messageTypeFromString(root["kind"].asString(), outMsg.kind, outErr ) )
+      return false;
+  
+    if (!jsonValueToReachType(root["reach"], outMsg.reach, outErr)) {
+      return false;
     }
-    catch (const std::exception& e)
-    {
-        outErr = std::string("parse message root: ") + e.what();
-        return false;
-    }
-    return true;
+    outMsg.sender = root["sender"].asString();
+    outMsg.peerID  = root["peerID"].asString();
+    outMsg.content = root["content"];
+  }
+  catch (const std::exception& e)
+  {
+    outErr = std::string("parse message root: ") + e.what();
+    return false;
+  }
+  
+  return true;
 }
