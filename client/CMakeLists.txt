@@ -19,6 +19,8 @@ add_executable(FSShareClient
     src/webrtc_signal_message.h
     src/webrtc_signal_connection.cc
     src/webrtc_signal_connection.h
+    src/webrtc_peer_connection.cc
+    src/webrtc_peer_connection.h
 )
 
 # 头文件搜索路径（src 目录）
