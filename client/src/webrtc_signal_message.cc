@@ -247,6 +247,10 @@ bool DisconnectionNotificationContent::fromJson(const Json::Value& jv, std::stri
     return true;
 }
 
+IdentifySelfContent* IdentifySelfContent::ToIdentifySelfContent() {
+  return this;
+}
+
 // ========= Message 成员 =========
 std::unique_ptr<BaseContent> Message::unmarshalContent(std::string& outErr) {
     outErr.clear();

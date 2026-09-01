@@ -32,7 +32,10 @@ int main() {
   
   client.on_text_msg = [&client](const std::string& msg){
     //std::cout << "[wsclient]text message ->" << msg << std::endl;
-    client.HandleMessage(msg);
+    std::string err;
+    if( !client.HandleMessage(msg, err) ) {
+      std::cout << "[wsclient] handle message failed ->" << msg << std::endl;
+    }
   };
   
   client.on_error = []( int err ) {

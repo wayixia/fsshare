@@ -29,11 +29,21 @@ enum class MessageType : int {
 
 std::string messageTypeToString(MessageType t);
 
+
+
 // ---------------- BaseContent 抽象基类 ----------------
+struct IdentifySelfContent;
+
+
 struct BaseContent {
-    virtual ~BaseContent() = default;
-    virtual Json::Value toJson() const = 0;
-    virtual bool fromJson(const Json::Value& jv, std::string& err) = 0;
+  virtual ~BaseContent() = default;
+  virtual Json::Value toJson() const = 0;
+  virtual bool fromJson(const Json::Value& jv, std::string& err) = 0;
+  
+  virtual IdentifySelfContent* ToIdentifySelfContent() {
+    return nullptr;
+  }
+  
 };
 
 // ---------------- Content 子类 ----------------
@@ -73,9 +83,10 @@ struct ICECandidateContent : public BaseContent {
 };
 
 struct IdentifySelfContent : public BaseContent {
-    std::string ID;
-    Json::Value toJson() const override;
-    bool fromJson(const Json::Value& jv, std::string& err) override;
+  std::string ID;
+  Json::Value toJson() const override;
+  bool fromJson(const Json::Value& jv, std::string& err) override;
+  IdentifySelfContent* ToIdentifySelfContent() override;
 };
 
 struct DisconnectionNotificationContent : public BaseContent {

@@ -7,7 +7,15 @@
 WebRTCSignalConnection::WebRTCSignalConnection(SimpleThread* net_thread)
 : WebSocketClient(net_thread)
 {
-  
+  // Dispatch Message map
+  msgmap_[MessageType::GetAllPeerIDs] = std::bind( &WebRTCSignalConnection::HandleMessageGetAllPeerIDs, this, std::placeholders::_1);
+  msgmap_[MessageType::TextMessage] = std::bind( &WebRTCSignalConnection::HandleMessageTextMessage, this, std::placeholders::_1);
+  msgmap_[MessageType::Disconnect] = std::bind( &WebRTCSignalConnection::HandleMessageDisconnect, this, std::placeholders::_1);
+  msgmap_[MessageType::Offer] = std::bind( &WebRTCSignalConnection::HandleMessageOffer, this, std::placeholders::_1);
+  msgmap_[MessageType::Answer] = std::bind( &WebRTCSignalConnection::HandleMessageAnswer, this, std::placeholders::_1);
+  msgmap_[MessageType::ICECandidate] = std::bind( &WebRTCSignalConnection::HandleMessageICECandidate, this, std::placeholders::_1);
+  msgmap_[MessageType::IdentifySelf] = std::bind( &WebRTCSignalConnection::HandleMessageIdentifySelf, this, std::placeholders::_1);
+  msgmap_[MessageType::DisconnectionNotification] = std::bind( &WebRTCSignalConnection::HandleMessageDisconnectionNotification, this, std::placeholders::_1);
 }
 
 WebRTCSignalConnection::~WebRTCSignalConnection()
@@ -52,7 +60,7 @@ void WebRTCSignalConnection::IdentifySelf()
     SendText(identifySelfMsgJson); 
 }
 
-void WebRTCSignalConnection::HandleMessage(const std::string &msg)
+bool WebRTCSignalConnection::HandleMessage(const std::string &msg, std::string& err)
 {
   Json::Value root;
   Json::CharReaderBuilder builder;
@@ -68,69 +76,79 @@ void WebRTCSignalConnection::HandleMessage(const std::string &msg)
 
   if (!success) {
     std::cout << "解析失败: " << errors << std::endl;
-    return;
+    return false;
   }
 
   std::cout << "mesasge type: " << root["kind"].asString() << std::endl;
   Message outMsg;
-  std::string err;
   if( !jsonToMessage(root, outMsg, err) ) {
     std::cout << "[signal] handle message error: invalid message" << std::endl;
-    return;
+    return false;
   }
   
-  //std::unique_ptr<BaseContent> content = outMsg.unmarshalContent(err);
-  
-  bool result = false;
-  
-  // Dispatch Message
-  switch( outMsg.kind ) {
-    case MessageType::GetAllPeerIDs:
-      
-      break;
-    case MessageType::TextMessage:
-      
-      break;
-    case MessageType::Disconnect:
-      
-      break;
-    case MessageType::Offer:
-      
-      break;
-    case MessageType::Answer:
-      
-      break;
-    case MessageType::ICECandidate:
-      
-      break;
-    case MessageType::IdentifySelf:
-      {
-        IdentifySelfContent content;
-        if(content.fromJson(outMsg.content, err) ) {
-          HandleIdentifySelf(content);
-        }
-      }
-      break;
-    case MessageType::DisconnectionNotification:
-      
-      break;
+  std::unique_ptr<BaseContent> content = outMsg.unmarshalContent(err);
+  if( !content ) {
+    err = "[signal] handle message error: invalid message";
+    return false;
   }
   
-  std::cout << "" << std::endl;
+  auto handler = msgmap_.find(outMsg.kind);
+  if( handler != msgmap_.end()) {
+    auto f = handler->second;
+    if( f ) {
+      return f(content.get());
+    }
+  }
+  
+  std::cout << "[signal] invalid message type " << int(outMsg.kind) << std::endl;
+  return false;
 }
 
 
-bool WebRTCSignalConnection::HandleIdentifySelf( BaseContent* content )
-{
-  IdentifySelfContent* c = content->ToIdentifySelfContent();
-  if( !c ) {
-    return false;
-  }
-  if( c->ID.empty() )
+bool WebRTCSignalConnection::HandleMessageGetAllPeerIDs( BaseContent* content ) {
+  return false;
+}
+
+bool WebRTCSignalConnection::HandleMessageTextMessage( BaseContent* content ) {
+  return false;
+}
+
+bool WebRTCSignalConnection::HandleMessageDisconnect( BaseContent* content ) {
+  return false;
+}
+
+bool WebRTCSignalConnection::HandleMessageOffer( BaseContent* content ) {
+  return false;
+}
+
+bool WebRTCSignalConnection::HandleMessageAnswer( BaseContent* content ) {
+  return false;
+}
+
+bool WebRTCSignalConnection::HandleMessageICECandidate( BaseContent* content ) {
+  return false;
+}
+
+bool WebRTCSignalConnection::HandleMessageIdentifySelf( BaseContent* content ) {
   {
-    return false;
+    IdentifySelfContent* c = content->ToIdentifySelfContent();
+    if( !c ) {
+      return false;
+    }
+    if( c->ID.empty() )
+    {
+      return false;
+    }
+    
+    id_ = c->ID;
+    
+    return true;
   }
-  
-  id_ = content.ID;
+}
+
+bool WebRTCSignalConnection::HandleMessageDisconnectionNotification( BaseContent* content)
+{
   return true;
 }
+
+
