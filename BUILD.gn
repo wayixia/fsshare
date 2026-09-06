@@ -73,6 +73,10 @@ if (is_linux || is_chromeos || is_win || is_mac) {
       "deps/include"
     ]
     sources = [
+      "peerconnection/src/sharertc_signal_message.cc",
+      "peerconnection/src/sharertc_signal_message.h",
+      "peerconnection/src/sharertc_signal_connection.cc",
+      "peerconnection/src/sharertc_signal_connection.h",
       "peerconnection/src/sharertc_client.cc",
       "peerconnection/src/sharertc_client.h",
       "peerconnection/src/defaults.cc",

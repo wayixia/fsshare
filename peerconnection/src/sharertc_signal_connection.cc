@@ -7,7 +7,7 @@
 ShareRTCSignalConnection::ShareRTCSignalConnection( ISignalSocket* sock)
 : socket_(sock)
 {
-  socket_->SetObserver(this);
+  //socket_->SetObserver(this);
 
   // Dispatch Message map
   msgmap_[MessageType::GetAllPeerIDs] = std::bind( &ShareRTCSignalConnection::HandleMessageGetAllPeerIDs, this, std::placeholders::_1);
@@ -34,12 +34,7 @@ void ShareRTCSignalConnection::IdentifySelf()
     // 序列化内层content
     Json::Value contentJson = identifySelfMsgContent.toJson();
     std::string identifySelfMsgContentJson;
-    try {
-      identifySelfMsgContentJson = contentJson.toStyledString();
-    } catch (const std::exception& e) {
-      std::cout << "Error parsing message content " << e.what() << std::endl;
-      return;
-    }
+    identifySelfMsgContentJson = contentJson.toStyledString();
 
     // 组装外层Message
     Message identifySelfMsg{};
@@ -52,14 +47,9 @@ void ShareRTCSignalConnection::IdentifySelf()
     Json::Value outerJson = messageToJson(identifySelfMsg);
 
     std::string identifySelfMsgJson;
-    try {
         identifySelfMsgJson = outerJson.toStyledString();
-    } catch (const std::exception& e) {
-        std::cout << "Error marshalling message " << e.what() << std::endl;
-        return;
-    }
 
-    SendText(identifySelfMsgJson); 
+    //SendText(identifySelfMsgJson); 
 }
 
 bool ShareRTCSignalConnection::HandleMessage(const std::string &msg, std::string& err)

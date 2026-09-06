@@ -45,7 +45,7 @@ protected:
   bool InitializePeerConnection();
   bool ReinitializePeerConnectionForLoopback();
   ShareRTCSession* OnCreateRTCSession( const char* ice_servers, const char* username, const char* secpass );
-  void DeletePeerConnection();
+  //void DeletePeerConnection();
   void EnsureStreamingUI();
   void AddTracks();
 

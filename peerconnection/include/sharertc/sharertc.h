@@ -3,6 +3,7 @@
 
 #include <memory>
 #include <string>
+#include <cstdint>
 
 
 // ==================== DLL 导出/导入宏 ====================

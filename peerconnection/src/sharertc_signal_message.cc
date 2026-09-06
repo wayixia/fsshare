@@ -1,5 +1,5 @@
-#include "webrtc_signal_message.h"
-#include "compatible.h"
+
+#include "sharertc/peerconnection/src/sharertc_signal_message.h"
 #include <sstream>
 
 // ========== ReachType ==========
@@ -271,12 +271,7 @@ std::unique_ptr<BaseContent> Message::unmarshalContent(std::string& outErr) {
 
 bool Message::marshalContent(const BaseContent& payload, std::string& outErr) {
     outErr.clear();
-    try {
         content = payload.toJson();
-    } catch (...) {
-        outErr = "marshal content exception";
-        return false;
-    }
     return true;
 }
 
@@ -295,8 +290,6 @@ Json::Value messageToJson(const Message& msg)
 bool jsonToMessage(const Json::Value& root, Message& outMsg, std::string& outErr)
 {
   outErr.clear();
-  try
-  {
     if( !messageTypeFromString(root["kind"].asString(), outMsg.kind, outErr ) )
       return false;
   
@@ -306,12 +299,6 @@ bool jsonToMessage(const Json::Value& root, Message& outMsg, std::string& outErr
     outMsg.sender = root["sender"].asString();
     outMsg.peerID  = root["peerID"].asString();
     outMsg.content = root["content"];
-  }
-  catch (const std::exception& e)
-  {
-    outErr = std::string("parse message root: ") + e.what();
-    return false;
-  }
   
   return true;
 }

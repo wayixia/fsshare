@@ -147,7 +147,7 @@ bool ShareRTCClient::InitializePeerConnection() {
   if (!peer_connection_factory_) {
     //main_wnd_->MessageBox("Error", "Failed to initialize PeerConnectionFactory",
     //                      true);
-    DeletePeerConnection();
+    //DeletePeerConnection();
     return false;
   }
 
