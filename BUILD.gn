@@ -20,19 +20,19 @@ if (is_android) {
   import("//build/config/linux/pkg_config.gni")
 }
 
-group("sharertc") {
+group("sharertc_module") {
   # This target shall build all targets in sharertc.
-  testonly = true
+  #testonly = true
   deps = []
 
   if (is_linux || is_chromeos || is_win || is_mac) {
     deps += [
       # ":peerconnection_server",
-      ":stunserver",
-      ":turnserver",
+      #":stunserver",
+      #":turnserver",
     ]
     if (current_os != "winuwp") {
-      deps += [ ":sharertc_client" ]
+      deps += [ ":sharertc" ]
     }
   }
 }
@@ -40,7 +40,7 @@ group("sharertc") {
 
 
 rtc_library("read_auth_file") {
-  testonly = true
+  #testonly = true
   sources = [
     "turnserver/read_auth_file.cc",
     "turnserver/read_auth_file.h",
@@ -66,34 +66,27 @@ if (is_linux || is_chromeos || is_win || is_mac) {
     }
   }
 
-  rtc_executable("sharertc_client") {
-    testonly = true
-    #defines += [ "WEBRTC_CHROMIUM_BUILD" ]
+  rtc_shared_library("sharertc") {
+    #testonly = true
+    # defines += [ "WEBRTC_CHROMIUM_BUILD" ]
     include_dirs = [
       "deps/include"
     ]
     sources = [
-      "peerconnection/client/conductor.cc",
-      "peerconnection/client/conductor.h",
-      "peerconnection/client/defaults.cc",
-      "peerconnection/client/defaults.h",
-      "peerconnection/client/peer_connection_client.cc",
-      "peerconnection/client/peer_connection_client.h",
-      "peerconnection/client/websocket_client.cc",
-      "peerconnection/client/websocket_client.h",
+      "peerconnection/src/sharertc_client.cc",
+      "peerconnection/src/sharertc_client.h",
+      "peerconnection/src/defaults.cc",
+      "peerconnection/src/defaults.h",
     ]
 
     libs = [
-      "deps/lib/libwebsockets.a",
-      "deps/lib/libcrypto.a",
-      "deps/lib/libssl.a",
     ]
 
     deps = [
       "../api:array_view",
       "../api:async_dns_resolver",
       "../api:audio_options_api",
-      "../api:create_frame_generator",
+      #"../api:create_frame_generator",
       "../api:create_modular_peer_connection_factory",
       "../api:enable_media",
       "../api:field_trials",
@@ -134,10 +127,10 @@ if (is_linux || is_chromeos || is_win || is_mac) {
       "../rtc_base:threading",
       "../rtc_base/third_party/sigslot",
       "../system_wrappers",
-      "../test:frame_generator_capturer",
-      "../test:platform_video_capturer",
-      "../test:rtp_test_utils",
-      "../test:test_video_capturer",
+      #"../test:frame_generator_capturer",
+      #"../test:platform_video_capturer",
+      #"../test:rtp_test_utils",
+      #"../test:test_video_capturer",
       "//third_party/abseil-cpp/absl/base:nullability",
       "//third_party/abseil-cpp/absl/memory",
       "//third_party/jsoncpp",
@@ -194,8 +187,8 @@ if (is_linux || is_chromeos || is_win || is_mac) {
       "../modules/audio_processing",
       "../modules/video_capture:video_capture_module",
       "../pc:libjingle_peerconnection",
-      "../rtc_base:rtc_json",
-      "../test:video_test_common",
+      #"../rtc_base:rtc_json",
+      #"../test:video_test_common",
       "//third_party/abseil-cpp/absl/flags:flag",
       "//third_party/abseil-cpp/absl/flags:parse",
       "//third_party/libyuv",
@@ -203,7 +196,7 @@ if (is_linux || is_chromeos || is_win || is_mac) {
   }
 
   rtc_executable("peerconnection_server") {
-    testonly = true
+    #testonly = true
     sources = [
       "peerconnection/server/data_socket.cc",
       "peerconnection/server/data_socket.h",
@@ -224,14 +217,14 @@ if (is_linux || is_chromeos || is_win || is_mac) {
     ]
   }
   rtc_executable("turnserver") {
-    testonly = true
+    #testonly = true
     sources = [ "turnserver/turnserver_main.cc" ]
     deps = [
       ":read_auth_file",
       "../api/environment",
       "../api/environment:environment_factory",
       "../p2p:basic_packet_socket_factory",
-      "../p2p:p2p_server_utils",
+      #"../p2p:p2p_server_utils",
       "../p2p:port_interface",
       "../pc:rtc_pc",
       "../rtc_base:async_udp_socket",
@@ -244,11 +237,11 @@ if (is_linux || is_chromeos || is_win || is_mac) {
     ]
   }
   rtc_executable("stunserver") {
-    testonly = true
+    #testonly = true
     sources = [ "stunserver/stunserver_main.cc" ]
     deps = [
       "../api/environment:environment_factory",
-      "../p2p:p2p_server_utils",
+      #"../p2p:p2p_server_utils",
       "../pc:rtc_pc",
       "../rtc_base:async_udp_socket",
       "../rtc_base:checks",

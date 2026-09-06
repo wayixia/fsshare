@@ -8,8 +8,8 @@
  *  be found in the AUTHORS file in the root of the source tree.
  */
 
-#ifndef EXAMPLES_PEERCONNECTION_CLIENT_CONDUCTOR_H_
-#define EXAMPLES_PEERCONNECTION_CLIENT_CONDUCTOR_H_
+#ifndef SHARERTC_CONTROL_H_
+#define SHARERTC_CONTROL_H_
 
 #include <deque>
 #include <memory>
@@ -33,7 +33,7 @@ namespace webrtc {
 class VideoCaptureModule;
 }  // namespace webrtc
 
-class Conductor : public webrtc::PeerConnectionObserver,
+class ShareRTCControl : public webrtc::PeerConnectionObserver,
                   public webrtc::CreateSessionDescriptionObserver,
                   public PeerConnectionClientObserver,
                   public MainWndCallback {
@@ -46,7 +46,7 @@ class Conductor : public webrtc::PeerConnectionObserver,
     TRACK_REMOVED,
   };
 
-  Conductor(const webrtc::Environment& env,
+  ShareRTCControl(const webrtc::Environment& env,
             PeerConnectionClient* absl_nonnull client,
             MainWindow* absl_nonnull main_wnd);
 
@@ -91,17 +91,11 @@ class Conductor : public webrtc::PeerConnectionObserver,
   //
 
   void OnSignedIn() override;
-
   void OnDisconnected() override;
-
   void OnPeerConnected(int id, const std::string& name) override;
-
   void OnPeerDisconnected(int id) override;
-
   void OnMessageFromPeer(int peer_id, const std::string& message) override;
-
   void OnMessageSent(int err) override;
-
   void OnServerConnectionFailure() override;
 
   //

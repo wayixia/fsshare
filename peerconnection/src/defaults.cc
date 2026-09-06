@@ -8,7 +8,7 @@
  *  be found in the AUTHORS file in the root of the source tree.
  */
 
-#include "sharertc/peerconnection/client/defaults.h"
+#include "sharertc/peerconnection/src/defaults.h"
 
 #include <cstdint>
 #include <cstdlib>
