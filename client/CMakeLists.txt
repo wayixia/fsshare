@@ -15,18 +15,22 @@ add_executable(FSShareClient
     src/websocket_client.h
     src/simple_thread.cc
     src/simple_thread.h
-    src/webrtc_signal_message.cc
-    src/webrtc_signal_message.h
-    src/webrtc_signal_connection.cc
-    src/webrtc_signal_connection.h
-    src/webrtc_peer_connection.cc
-    src/webrtc_peer_connection.h
+#    src/webrtc_signal_message.cc
+#    src/webrtc_signal_message.h
+#    src/webrtc_signal_connection.cc
+#    src/webrtc_signal_connection.h
+#    src/webrtc_peer_connection.cc
+#    src/webrtc_peer_connection.h
 )
 
 # 头文件搜索路径（src 目录）
 target_include_directories(FSShareClient PRIVATE src)
 target_include_directories(FSShareClient PRIVATE include)
 target_include_directories(FSShareClient PRIVATE deps/include)
+
+
+target_link_directories(FSShareClient PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/deps/lib)
+target_link_libraries(FSShareClient PRIVATE sharertc_sdk)
 
 # ============================================
 # 依赖库配置（根据实际使用的 websocket 库修改）
@@ -39,6 +43,8 @@ target_link_libraries(FSShareClient PRIVATE websockets )
 set(jsoncpp_DIR "${CMAKE_CURRENT_SOURCE_DIR}/deps/lib/cmake/jsoncpp")
 find_package(jsoncpp REQUIRED)   # 如果提供了 CMake 配置
 target_link_libraries(FSShareClient PRIVATE JsonCpp::JsonCpp)
+
+
 
 # 示例 3：使用 Boost.Asio + Beast（需要 Boost 库）
 # find_package(Boost REQUIRED COMPONENTS system)

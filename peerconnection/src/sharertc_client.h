@@ -34,6 +34,7 @@
 
 
 class ShareRTCClient 
+: public IShareRTCClient
 //: public webrtc::PeerConnectionObserver
 //, public webrtc::CreateSessionDescriptionObserver
 {
@@ -107,6 +108,13 @@ protected:
   // CreateSessionDescriptionObserver implementation.
 //   void OnSuccess(webrtc::SessionDescriptionInterface* desc) override;
 //   void OnFailure(webrtc::RTCError error) override;
+
+
+    virtual void Login(const std::string& server, int port) override {}
+    virtual void DisconnectFromServer() override {}
+    virtual void ConnectToPeer(int peer_id) override {}
+    virtual void DisconnectPeer(int peer_id) override {}
+    virtual void Logout() override {}
 
 
  protected:

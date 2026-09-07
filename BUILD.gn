@@ -20,7 +20,7 @@ if (is_android) {
   import("//build/config/linux/pkg_config.gni")
 }
 
-group("sharertc_module") {
+group("sharertc") {
   # This target shall build all targets in sharertc.
   #testonly = true
   deps = []
@@ -32,7 +32,7 @@ group("sharertc_module") {
       #":turnserver",
     ]
     if (current_os != "winuwp") {
-      deps += [ ":sharertc" ]
+      deps += [ ":sharertc_sdk" ]
     }
   }
 }
@@ -66,13 +66,16 @@ if (is_linux || is_chromeos || is_win || is_mac) {
     }
   }
 
-  rtc_shared_library("sharertc") {
+  rtc_shared_library("sharertc_sdk") {
     #testonly = true
     # defines += [ "WEBRTC_CHROMIUM_BUILD" ]
+    
+    defines = ["SHARERTCCLIENT_EXPORTS"]
     include_dirs = [
       "deps/include"
     ]
     sources = [
+      "peerconnection/src/sharertc.cc",
       "peerconnection/src/sharertc_signal_message.cc",
       "peerconnection/src/sharertc_signal_message.h",
       "peerconnection/src/sharertc_signal_connection.cc",
@@ -81,6 +84,7 @@ if (is_linux || is_chromeos || is_win || is_mac) {
       "peerconnection/src/sharertc_client.h",
       "peerconnection/src/defaults.cc",
       "peerconnection/src/defaults.h",
+      
     ]
 
     libs = [
@@ -197,29 +201,9 @@ if (is_linux || is_chromeos || is_win || is_mac) {
       "//third_party/abseil-cpp/absl/flags:parse",
       "//third_party/libyuv",
     ]
+
   }
 
-  rtc_executable("peerconnection_server") {
-    #testonly = true
-    sources = [
-      "peerconnection/server/data_socket.cc",
-      "peerconnection/server/data_socket.h",
-      "peerconnection/server/main.cc",
-      "peerconnection/server/peer_channel.cc",
-      "peerconnection/server/peer_channel.h",
-    ]
-    deps = [
-      "../rtc_base:checks",
-      "../rtc_base:ip_address",
-      "../rtc_base:net_helpers",
-      "../rtc_base:stringutils",
-      "//third_party/abseil-cpp/absl/flags:flag",
-      "//third_party/abseil-cpp/absl/flags:parse",
-      "//third_party/abseil-cpp/absl/flags:usage",
-      "//third_party/abseil-cpp/absl/strings",
-      "//third_party/abseil-cpp/absl/strings:string_view",
-    ]
-  }
   rtc_executable("turnserver") {
     #testonly = true
     sources = [ "turnserver/turnserver_main.cc" ]

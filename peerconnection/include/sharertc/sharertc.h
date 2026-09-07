@@ -118,7 +118,7 @@ SHARERTCCLIENT_API void UnInitializeShareRTC();
  * @param pSignal 信令连接对象指针（由调用者创建并管理生命周期，必须保持有效）
  * @return 成功返回对象指针，失败返回 nullptr
  */
-SHARERTCCLIENT_API IShareRTCClient* CreateShareRTCClient();
+SHARERTCCLIENT_API IShareRTCClient* CreateShareRTCClient( ISignalSocket* sock );
 
 /**
  * @brief 销毁 IShareRTCClient 实例

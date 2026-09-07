@@ -1,6 +1,7 @@
 #pragma once
 
 #include "simple_thread.h"
+#include "sharertc/sharertc.h"
 #include <string>
 #include <memory>
 #include <vector>
@@ -33,13 +34,21 @@ enum class WsClientState {
  * libwebsockets WebSocket客户端
  * 事件回调内部跑在libws事件线程；消息会转发到传入的 webrtc net_thread
 */
-class WebSocketClient {
+class WebSocketClient : public ISignalSocket {
 public:
   /** 初始化 */
   static void Initialize();
 
   /**  反初始化 */
   static void Uninitialize();
+
+  void setObserver(ISignalSocketObserver* observer) override{
+
+  }
+  bool connect(const char* host, int port) override { return true; }
+  void disconnect() override {}
+  bool send(const uint8_t* data, size_t len) override {return true;}
+  bool isConnected() const override{ return true;};
 
 public:
   explicit WebSocketClient( SimpleThread* net_thread);

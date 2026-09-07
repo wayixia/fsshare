@@ -5,42 +5,44 @@
 
 int main() {
   WebSocketClient::Initialize();
-
   SimpleThread net_thread("WebSocketNetThread");
 
-  WebRTCSignalConnection client(&net_thread); // 传入 nullptr 或实际的 net_thread 指针
-  client.on_state_change = [&client](WsClientState state) {
-    const char* sstate = "unknown";
-    switch( state ) {
-      case WsClientState::kOpen:
-        sstate = "open";
-        client.IdentifySelf();
-        //client.SendText("{\"kind\":\"TextMessage\"}");
-        break;
-      case WsClientState::kClosing:
-        sstate = "closing";
-        break;
-      case WsClientState::kConnecting:
-        sstate = "connecting";
-        break;
-      case WsClientState::kDisconnected:
-        sstate = "disconnected";
-        break;
-    } // end switch
-    std::cout << "[websocket] state => " << sstate << std::endl;
-  };
+  WebSocketClient client(&net_thread); // 传入 nullptr 或实际的 net_thread 指针
+  // client.on_state_change = [&client](WsClientState state) {
+  //   const char* sstate = "unknown";
+  //   switch( state ) {
+  //     case WsClientState::kOpen:
+  //       sstate = "open";
+  //       //client.IdentifySelf();
+  //       //client.SendText("{\"kind\":\"TextMessage\"}");
+  //       break;
+  //     case WsClientState::kClosing:
+  //       sstate = "closing";
+  //       break;
+  //     case WsClientState::kConnecting:
+  //       sstate = "connecting";
+  //       break;
+  //     case WsClientState::kDisconnected:
+  //       sstate = "disconnected";
+  //       break;
+  //   } // end switch
+  //   std::cout << "[websocket] state => " << sstate << std::endl;
+  // };
   
-  client.on_text_msg = [&client](const std::string& msg){
-    //std::cout << "[wsclient]text message ->" << msg << std::endl;
-    std::string err;
-    if( !client.HandleMessage(msg, err) ) {
-      std::cout << "[wsclient] handle message failed ->" << msg << std::endl;
-    }
-  };
+  // client.on_text_msg = [&client](const std::string& msg){
+  //   //std::cout << "[wsclient]text message ->" << msg << std::endl;
+  //   std::string err;
+  //   if( !client.HandleMessage(msg, err) ) {
+  //     std::cout << "[wsclient] handle message failed ->" << msg << std::endl;
+  //   }
+  // };
   
-  client.on_error = []( int err ) {
+  // client.on_error = []( int err ) {
     
-  };
+  // };
+  
+  IShareRTCClient* cli = CreateShareRTCClient();
+  
   
   
   net_thread.Start(); // 启动线程
