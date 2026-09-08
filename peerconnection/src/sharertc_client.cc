@@ -415,12 +415,10 @@ bool ShareRTCClient::ReinitializePeerConnectionForLoopback() {
 // MainWndCallback implementation.
 //
 
-// void ShareRTCClient::StartLogin(const std::string& server, int port) {
-//   if (client_->is_connected())
-//     return;
-//   server_ = server;
-//   client_->Connect(server, port, GetPeerName());
-// }
+void ShareRTCClient::Login(const char* signalserver, const char* token ) {
+  // 目前简单处理， 直接链接信令服务器
+  signal_connection_.Connect(signalserver, token)
+}
 
 // void ShareRTCClient::DisconnectFromServer() {
 //   if (client_->is_connected())

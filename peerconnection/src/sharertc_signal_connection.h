@@ -12,6 +12,10 @@ public:
   ShareRTCSignalConnection(ISignalSocket* sock);
   ~ShareRTCSignalConnection();
 
+// Connect
+public:
+  void Connect( const std::string& url, const std::string& token );
+
 // Operations
 public:
   void IdentifySelf();

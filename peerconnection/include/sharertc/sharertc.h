@@ -94,7 +94,7 @@ class IShareRTCClient {
 public:
     virtual ~IShareRTCClient() = default;
 
-    virtual void Login(const std::string& server, int port) = 0;
+    virtual void Login(const char* signalserver, const char* token ) = 0;
     virtual void DisconnectFromServer() = 0;
     virtual void ConnectToPeer(int peer_id) = 0;
     virtual void DisconnectPeer(int peer_id) = 0;
