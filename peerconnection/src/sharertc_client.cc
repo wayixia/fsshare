@@ -95,14 +95,20 @@ ShareRTCClient::ShareRTCClient(const webrtc::Environment& env, ISignalSocket* si
   : peer_id_(-1)
   , loopback_(false)
   , env_(env)
-  , signal_connection_(signalsock) 
+  , signal_connection_(std::bind( &ShareRTCClient::SendMessage, this, std::placeholders::_1) )
+  , socket_(signalsock)
 { 
+  socket_->setObserver(this);
   ///client_->RegisterObserver(this);
   //main_wnd->RegisterObserver(this);
 }
 
 ShareRTCClient::~ShareRTCClient() {
   //RTC_DCHECK(!peer_connection_);
+}
+
+void ShareRTCClient::onConnected() {
+  signal_connection_.IdentifySelf();
 }
 
 // bool ShareRTCClient::connection_active() const {
@@ -417,7 +423,7 @@ bool ShareRTCClient::ReinitializePeerConnectionForLoopback() {
 
 void ShareRTCClient::Login(const char* signalserver, const char* token ) {
   // 目前简单处理， 直接链接信令服务器
-  signal_connection_.Connect(signalserver, token)
+  socket_->connect(signalserver, token);
 }
 
 // void ShareRTCClient::DisconnectFromServer() {
@@ -588,7 +594,16 @@ void ShareRTCClient::AddTracks() {
 //   RTC_LOG(LS_ERROR) << ToString(error.type()) << ": " << error.message();
 // }
 
-void ShareRTCClient::SendMessage(const std::string& json_object) {
-  //std::string* msg = new std::string(json_object);
-  //main_wnd_->QueueUIThreadCallback(SEND_MESSAGE_TO_PEER, msg);
+int ShareRTCClient::SendMessage(const std::string& json_object) {
+
+  assert(socket_ != nullptr);
+  if( !socket_ || !socket_->isConnected() ) {
+    return -1;
+  }
+
+  if( !socket_->send( (const uint8_t*)json_object.c_str(), json_object.size()) ) {
+    return -2;
+  }
+
+  return 0;
 }

@@ -19,6 +19,7 @@ struct WebSocketClient::Impl {
   uint8_t msg_opcode; // 记录第一条分片opcode
   WsClientConfig config;
   std::string url_;
+  std::string token_;
   std::string host;
   int port = 0;
   std::string path;
@@ -65,19 +66,20 @@ void WebSocketClient::SetConfig(const WsClientConfig& cfg) {
 }
 
 
-bool WebSocketClient::ConnectUrl(const std::string& url) {
-  net_thread_->PostTask([this,url]{
-    DoConnectUrl(url);
+bool WebSocketClient::ConnectUrl(const std::string& url, const std::string& token ) {
+  net_thread_->PostTask([this,url, token]{
+    DoConnectUrl(url, token);
   });
   impl_->Start();
 }
 
-bool WebSocketClient::DoConnectUrl(const std::string& url) {
+bool WebSocketClient::DoConnectUrl(const std::string& url, const std::string& token) {
   //RTC_DCHECK_RUN_ON(net_thread_);
   if (!impl_->ParseUrl(url)) {
-    if(on_error) {
-      on_error(-100);
-    }
+//    if(on_error) {
+//      on_error(-100);
+//    }
+    OnError(-100);
     return false;
   }
   
@@ -104,7 +106,8 @@ bool WebSocketClient::DoConnectUrl(const std::string& url) {
   impl_->context = lws_create_context(&info);
   if (!impl_->context) {
     impl_->Log("lws create context failed");
-    if(on_error) on_error(-101);
+    //if(on_error) on_error(-101);
+    OnError(-101);
     return false;
   }
 
@@ -180,6 +183,34 @@ bool WebSocketClient::SendBinary(const uint8_t* data, size_t len) {
   return ret >=0;
 }
 
+
+void WebSocketClient::OnStateChange(WsClientState state)
+{
+  if( state == WsClientState::kOpen )
+  {
+    observer_->onConnected();
+  }
+  else if( state == WsClientState::kDisconnected)
+  {
+    observer_->onDisconnected();
+  }
+}
+
+void WebSocketClient::OnTextMessage(const std::string& msg)
+{
+  observer_->onDataReceived( (const uint8_t*)msg.data(), msg.length() );
+}
+
+void WebSocketClient::OnBinaryMessage(const uint8_t* data, size_t len)
+{
+  observer_->onDataReceived( data, len );
+}
+
+void WebSocketClient::OnError(int err)
+{
+  observer_->onError(err, "");
+}
+
 // Impl 实现
 WebSocketClient::Impl::Impl(SimpleThread* t)
 : net_thread_(t)
@@ -207,7 +238,8 @@ void WebSocketClient::Impl::SetState(WsClientState s) {
   if(state == s) return;
   state = s;
   outer->net_thread_->PostTask([this,s](){
-   if(outer->on_state_change) outer->on_state_change(s);
+   //if(outer->on_state_change) outer->on_state_change(s);
+    outer->OnStateChange(s);
   });
 }
 
@@ -277,14 +309,15 @@ void WebSocketClient::Impl::TryReconnect() {
   if(retry_counter >= config.max_retry_count){
     Log("max retry reached");
     net_thread_->PostTask([this](){
-     if(outer->on_error) outer->on_error(-2);
+     //if(outer->on_error) outer->on_error(-2);
+      outer->OnError(-2);
     });
     return;
   }
   retry_counter++;
   Log("schedule reconnect try=%d delay=%dms", retry_counter, config.retry_delay_ms);
   net_thread_->PostDelayedTask([this](){
-    outer->ConnectUrl(url_);
+    outer->ConnectUrl(url_, token_);
   }, config.retry_delay_ms);
 }
 
@@ -314,36 +347,25 @@ int WebSocketClient::Impl::LwsCallback(struct lws *wsi, enum lws_callback_reason
       if(impl->msg_opcode == 0x1) {
         // TEXT消息
         impl->net_thread_->PostTask([impl](){
-          if(impl->outer->on_text_msg) {
-            impl->outer->on_text_msg(
+//          if(impl->outer->on_text_msg) {
+//            impl->outer->on_text_msg(
+//              std::string((const char*)impl->msg_buf.data(), impl->msg_buf.size()));
+//          }
+            impl->outer->OnTextMessage(
               std::string((const char*)impl->msg_buf.data(), impl->msg_buf.size()));
-          }
           impl->msg_buf.clear();
         });
       } else if(impl->msg_opcode == 0x2) {
         // BINARY消息
         impl->net_thread_->PostTask([impl](){
-          if(impl->outer->on_binary_msg) {
-            impl->outer->on_binary_msg(impl->msg_buf.data(), impl->msg_buf.size());
-          }
+//          if(impl->outer->on_binary_msg) {
+//            impl->outer->on_binary_msg(impl->msg_buf.data(), impl->msg_buf.size());
+//          }
+            impl->outer->OnBinaryMessage(impl->msg_buf.data(), impl->msg_buf.size());
           impl->msg_buf.clear();
         });
       }
     }
-    // lws回调内部245行替换
-    //bool is_text = !!(impl->pending_write_flags & LWS_WRITE_TEXT);
-//    enum lws_write_protocol pktype = lws_get_packet_type(wsi) ;
-//    if( pktype == LWS_WRITE_TEXT ) {
-//      std::string msg((char*)in, len);
-//      impl->net_thread_->PostTask([impl,msg](){
-//        if(impl->outer->on_text_msg) impl->outer->on_text_msg(msg);
-//      });
-//    }else if(pktype == LWS_WRITE_BINARY) {
-//      std::vector<uint8_t> bin((uint8_t*)in, (uint8_t*)in+len);
-//      impl->net_thread_->PostTask([impl, bin](){
-//        if(impl->outer->on_binary_msg) impl->outer->on_binary_msg(bin.data(), bin.size());
-//      });
-//    }
     break;
   }
 

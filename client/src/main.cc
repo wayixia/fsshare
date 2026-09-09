@@ -89,7 +89,7 @@ int main() {
   //std::cout << "Enter WebSocket URL (ws:// or wss://): ";
   //std::getline(std::cin, url);
   url = "ws://localhost:8090/signalingserver";
-  cli->Login("localhost", 8090);
+  cli->Login( url.c_str(), "localhost");
   
   while(1) {
     std::this_thread::sleep_for(std::chrono::milliseconds(50));

@@ -4,11 +4,9 @@
 
 
 
-ShareRTCSignalConnection::ShareRTCSignalConnection( ISignalSocket* sock)
-: socket_(sock)
+ShareRTCSignalConnection::ShareRTCSignalConnection( const std::function<int(const std::string&)>& sendmsg )
+: sendmsg_fn_(std::move(sendmsg))
 {
-  //socket_->SetObserver(this);
-
   // Dispatch Message map
   msgmap_[MessageType::GetAllPeerIDs] = std::bind( &ShareRTCSignalConnection::HandleMessageGetAllPeerIDs, this, std::placeholders::_1);
   msgmap_[MessageType::TextMessage] = std::bind( &ShareRTCSignalConnection::HandleMessageTextMessage, this, std::placeholders::_1);
@@ -50,6 +48,7 @@ void ShareRTCSignalConnection::IdentifySelf()
         identifySelfMsgJson = outerJson.toStyledString();
 
     //SendText(identifySelfMsgJson); 
+    sendmsg_fn_(identifySelfMsgJson);
 }
 
 bool ShareRTCSignalConnection::HandleMessage(const std::string &msg, std::string& err)

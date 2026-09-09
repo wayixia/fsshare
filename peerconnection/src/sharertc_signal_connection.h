@@ -7,24 +7,15 @@
 #pragma once
 
 class ShareRTCSignalConnection 
-: public ISignalSocketObserver {
+{
 public:
-  ShareRTCSignalConnection(ISignalSocket* sock);
+  ShareRTCSignalConnection( const std::function<int(const std::string&)>& sendmsg);
   ~ShareRTCSignalConnection();
-
-// Connect
-public:
-  void Connect( const std::string& url, const std::string& token );
 
 // Operations
 public:
   void IdentifySelf();
 
-public:
-  void onConnected() override {}
-  void onDisconnected() override {}
-  void onError(int code, const char* msg) override {}
-  void onDataReceived(const uint8_t* data, size_t len) override {}
 
 // Handle messages
 public:
@@ -41,5 +32,5 @@ public:
 private:
   std::map<MessageType, std::function<bool(BaseContent*)> > msgmap_;
   std::string id_;
-  std::unique_ptr<ISignalSocket> socket_;
+  std::function<int(const std::string&)> sendmsg_fn_;
 };

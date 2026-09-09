@@ -38,7 +38,7 @@ class ISignalSocket {
 public:
     virtual ~ISignalSocket() = default;
     virtual void setObserver(ISignalSocketObserver* observer) = 0;
-    virtual bool connect(const char* host, int port) = 0;
+    virtual bool connect(const char* url, const char* token) = 0;
     virtual void disconnect() = 0;
     virtual bool send(const uint8_t* data, size_t len) = 0;
     virtual bool isConnected() const = 0;

@@ -35,12 +35,20 @@
 
 class ShareRTCClient 
 : public IShareRTCClient
+, public ISignalSocketObserver
 //: public webrtc::PeerConnectionObserver
 //, public webrtc::CreateSessionDescriptionObserver
 {
 public:
   ShareRTCClient(const webrtc::Environment& env, ISignalSocket* signalsocket );
   ~ShareRTCClient();
+
+public:
+  void onConnected() override;
+  void onDisconnected() override {}
+  void onError(int code, const char* msg) override {}
+  void onDataReceived(const uint8_t* data, size_t len) override {}
+
 
 protected:
   bool InitializePeerConnection();
@@ -119,7 +127,7 @@ protected:
 
  protected:
   // Send a message to the remote peer.
-  void SendMessage(const std::string& json_object);
+  int SendMessage(const std::string& json_object);
 
   int peer_id_;
   bool loopback_;
@@ -131,6 +139,7 @@ protected:
   std::string server_;
 
   ShareRTCSignalConnection signal_connection_;
+  ISignalSocket* socket_;
 };
 
 #endif  // EXAMPLES_PEERCONNECTION_CLIENT_CONDUCTOR_H_

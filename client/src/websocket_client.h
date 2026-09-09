@@ -43,9 +43,23 @@ public:
   static void Uninitialize();
 
   void setObserver(ISignalSocketObserver* observer) override{
-
+    assert( observer_ == nullptr);
+    observer_ = observer;
   }
-  bool connect(const char* host, int port) override { return true; }
+  
+  
+  bool connect(  const char* url, const char* token ) override {
+    if( !url || strlen(url) == 0) {
+      return false;
+    }
+
+    if( !token || strlen(token) == 0) {
+      return false;
+    }
+    
+    return ConnectUrl(url, token);
+  }
+  
   void disconnect() override {}
   bool send(const uint8_t* data, size_t len) override {return true;}
   bool isConnected() const override{ return true;};
@@ -55,23 +69,29 @@ public:
   ~WebSocketClient();
 
   void SetConfig(const WsClientConfig& cfg);
-  bool ConnectUrl(const std::string& url); // ws:// wss://
+  bool ConnectUrl(const std::string& url, const std::string& token); // ws:// wss://
   void Close();
 
   bool SendText(const std::string& text);
   bool SendBinary(const uint8_t* data, size_t len);
+  
+  void OnStateChange(WsClientState);
+  void OnTextMessage(const std::string&);
+  void OnBinaryMessage(const uint8_t*, size_t);
+  void OnError(int err);
 
   // 信号，全部在 net_thread 触发
-  std::function<void(WsClientState)> on_state_change;
-  std::function<void(const std::string&)> on_text_msg;
-  std::function<void(const uint8_t*, size_t)> on_binary_msg;
-  std::function<void(int err)> on_error;
+//  std::function<void(WsClientState)> on_state_change;
+//  std::function<void(const std::string&)> on_text_msg;
+//  std::function<void(const uint8_t*, size_t)> on_binary_msg;
+//  std::function<void(int err)> on_error;
 
 private:
-  bool DoConnectUrl(const std::string& url);
+  bool DoConnectUrl(const std::string& url, const std::string& token);
   
 private:
   struct Impl;
   std::unique_ptr<Impl> impl_;
   SimpleThread* net_thread_;
+  ISignalSocketObserver* observer_ = nullptr;
 };
