@@ -56,7 +56,7 @@ bool ShareRTCSignalConnection::HandleMessage(const std::string &msg, std::string
   Json::Value root;
   Json::CharReaderBuilder builder;
   std::unique_ptr<Json::CharReader> reader(builder.newCharReader());
-     
+
   std::string errors;
   bool success = reader->parse(
     msg.c_str(),                         // 起始指针

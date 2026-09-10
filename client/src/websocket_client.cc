@@ -196,14 +196,14 @@ void WebSocketClient::OnStateChange(WsClientState state)
   }
 }
 
-void WebSocketClient::OnTextMessage(const std::string& msg)
+void WebSocketClient::OnTextMessage(const uint8_t* data, size_t size)
 {
-  observer_->onDataReceived( (const uint8_t*)msg.data(), msg.length() );
+  observer_->onDataReceived( data, size );
 }
 
-void WebSocketClient::OnBinaryMessage(const uint8_t* data, size_t len)
+void WebSocketClient::OnBinaryMessage(const uint8_t* data, size_t size)
 {
-  observer_->onDataReceived( data, len );
+  observer_->onDataReceived( data, size );
 }
 
 void WebSocketClient::OnError(int err)
@@ -351,8 +351,8 @@ int WebSocketClient::Impl::LwsCallback(struct lws *wsi, enum lws_callback_reason
 //            impl->outer->on_text_msg(
 //              std::string((const char*)impl->msg_buf.data(), impl->msg_buf.size()));
 //          }
-            impl->outer->OnTextMessage(
-              std::string((const char*)impl->msg_buf.data(), impl->msg_buf.size()));
+          
+          impl->outer->OnTextMessage( impl->msg_buf.data(), impl->msg_buf.size());
           impl->msg_buf.clear();
         });
       } else if(impl->msg_opcode == 0x2) {
@@ -401,3 +401,38 @@ void WebSocketClient::Initialize() {
 void WebSocketClient::Uninitialize() {
   // nothing to do
 }
+
+
+
+void WebSocketClient::setObserver(ISignalSocketObserver* observer) {
+  assert( observer_ == nullptr);
+  observer_ = observer;
+}
+
+
+bool WebSocketClient::connect(  const char* url, const char* token ) {
+  if( !url || strlen(url) == 0) {
+    return false;
+  }
+
+  if( !token || strlen(token) == 0) {
+    return false;
+  }
+  
+  return ConnectUrl(url, token);
+}
+
+
+void WebSocketClient::disconnect()  {
+  Close();
+}
+
+bool WebSocketClient::send(const uint8_t* data, size_t len)  {
+  return SendText( std::string(( const char*)data, len) );
+}
+
+
+bool WebSocketClient::isConnected() const {
+  return ( impl_->state == WsClientState::kOpen );
+}
+

@@ -47,7 +47,7 @@ public:
   void onConnected() override;
   void onDisconnected() override {}
   void onError(int code, const char* msg) override {}
-  void onDataReceived(const uint8_t* data, size_t len) override {}
+  void onDataReceived(const uint8_t* data, size_t len) override;
 
 
 protected:

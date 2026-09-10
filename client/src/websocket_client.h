@@ -42,27 +42,13 @@ public:
   /**  反初始化 */
   static void Uninitialize();
 
-  void setObserver(ISignalSocketObserver* observer) override{
-    assert( observer_ == nullptr);
-    observer_ = observer;
-  }
-  
-  
-  bool connect(  const char* url, const char* token ) override {
-    if( !url || strlen(url) == 0) {
-      return false;
-    }
-
-    if( !token || strlen(token) == 0) {
-      return false;
-    }
-    
-    return ConnectUrl(url, token);
-  }
-  
-  void disconnect() override {}
-  bool send(const uint8_t* data, size_t len) override {return true;}
-  bool isConnected() const override{ return true;};
+// ISignalSocket
+public:
+  void setObserver(ISignalSocketObserver* observer) override;
+  bool connect(  const char* url, const char* token ) override;
+  void disconnect() override;
+  bool send(const uint8_t* data, size_t len) override;
+  bool isConnected() const override;
 
 public:
   explicit WebSocketClient( SimpleThread* net_thread);
@@ -76,7 +62,7 @@ public:
   bool SendBinary(const uint8_t* data, size_t len);
   
   void OnStateChange(WsClientState);
-  void OnTextMessage(const std::string&);
+  void OnTextMessage(const uint8_t*, size_t);
   void OnBinaryMessage(const uint8_t*, size_t);
   void OnError(int err);
 

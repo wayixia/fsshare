@@ -16,6 +16,7 @@
 #include <string>
 #include <utility>
 #include <vector>
+#include <iostream>
 
 #include "absl/base/nullability.h"
 #include "absl/memory/memory.h"
@@ -109,6 +110,20 @@ ShareRTCClient::~ShareRTCClient() {
 
 void ShareRTCClient::onConnected() {
   signal_connection_.IdentifySelf();
+}
+
+void ShareRTCClient::onDataReceived( const uint8_t* data, size_t len ) {
+  if( !data || len == 0 )
+  {
+    std::cout << "[signalconnection] invalid data or len";
+    return;
+  }
+
+  std::string err;
+  std::string msg((const char*)data, len);
+  if( !signal_connection_.HandleMessage( std::string(  ), err) ) {
+      std::cout << "[wsclient] handle message failed ->" << msg << std::endl;
+  }
 }
 
 // bool ShareRTCClient::connection_active() const {
