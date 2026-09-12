@@ -121,7 +121,7 @@ void ShareRTCClient::onDataReceived( const uint8_t* data, size_t len ) {
 
   std::string err;
   std::string msg((const char*)data, len);
-  if( !signal_connection_.HandleMessage( std::string(  ), err) ) {
+  if( !signal_connection_.HandleMessage( msg, err) ) {
       std::cout << "[wsclient] handle message failed ->" << msg << std::endl;
   }
 }

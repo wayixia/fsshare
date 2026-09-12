@@ -5,6 +5,7 @@ project(FSShareClient)
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+#set(CMAKE_BUILD_RPATH "${CMAKE_CURRENT_SOURCE_DIR}/../../out/Debug")
 # 设置编译器选项（可根据需要调整）
 # set(CMAKE_PREFIX_PATH "${CMAKE_CURRENT_SOURCE_DIR}/deps/include")
 
@@ -30,7 +31,7 @@ target_include_directories(FSShareClient PRIVATE deps/include)
 
 
 target_link_directories(FSShareClient PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/deps/lib)
-target_link_libraries(FSShareClient PRIVATE sharertc_sdk)
+
 
 # ============================================
 # 依赖库配置（根据实际使用的 websocket 库修改）
@@ -40,9 +41,9 @@ find_package(libwebsockets REQUIRED)   # 如果提供了 CMake 配置
 target_link_libraries(FSShareClient PRIVATE websockets )
 
 # jsoncpp
-set(jsoncpp_DIR "${CMAKE_CURRENT_SOURCE_DIR}/deps/lib/cmake/jsoncpp")
-find_package(jsoncpp REQUIRED)   # 如果提供了 CMake 配置
-target_link_libraries(FSShareClient PRIVATE JsonCpp::JsonCpp)
+#set(jsoncpp_DIR "${CMAKE_CURRENT_SOURCE_DIR}/deps/lib/cmake/jsoncpp")
+#find_package(jsoncpp REQUIRED)   # 如果提供了 CMake 配置
+#target_link_libraries(FSShareClient PRIVATE JsonCpp::JsonCpp)
 
 
 
@@ -52,3 +53,21 @@ target_link_libraries(FSShareClient PRIVATE JsonCpp::JsonCpp)
 
 # 如果没有任何外部依赖，上面的链接部分可以留空
 # 但你的 websocket_client 实现很可能依赖某个库，请按需启用并修改
+
+#set_target_properties(FSShareClient PROPERTIES
+#    INSTALL_RPATH "@loader_path/../../../../out/Debug"
+#)
+
+add_library(sharertc_sdk SHARED IMPORTED)
+set_target_properties( sharertc_sdk PROPERTIES
+    IMPORTED_LOCATION "${CMAKE_CURRENT_SOURCE_DIR}/../../out/Debug/libsharertc_sdk.dylib"
+)
+
+target_link_libraries(FSShareClient PRIVATE sharertc_sdk)
+
+add_custom_command(TARGET FSShareClient POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        $<TARGET_FILE:sharertc_sdk>
+        $<TARGET_FILE_DIR:FSShareClient>
+    COMMENT "Copy sharertc_sdk to FSShareClient output directory"
+)

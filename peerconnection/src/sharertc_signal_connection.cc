@@ -59,14 +59,14 @@ bool ShareRTCSignalConnection::HandleMessage(const std::string &msg, std::string
 
   std::string errors;
   bool success = reader->parse(
-    msg.c_str(),                         // 起始指针
-    msg.c_str() + msg.length(),   // 结束指针
+    msg.data(),                         // 起始指针
+    msg.data() + msg.size(),   // 结束指针
     &root,
     &errors
   );
 
   if (!success) {
-    std::cout << "解析失败: " << errors << std::endl;
+    std::cout << "解析失败1: " << errors << std::endl;
     return false;
   }
 
