@@ -82,6 +82,10 @@ if (is_linux || is_chromeos || is_win || is_mac) {
       "peerconnection/src/sharertc_signal_connection.h",
       "peerconnection/src/sharertc_client.cc",
       "peerconnection/src/sharertc_client.h",
+      "peerconnection/src/sharertc_control.cc",
+      "peerconnection/src/sharertc_control.h",
+      "peerconnection/src/sharertc_connection.cc",
+      "peerconnection/src/sharertc_connection.h",
       "peerconnection/src/defaults.cc",
       "peerconnection/src/defaults.h",
       

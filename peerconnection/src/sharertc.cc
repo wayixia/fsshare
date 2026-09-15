@@ -3,7 +3,7 @@
 #include "sharertc/peerconnection/include/sharertc/sharertc.h"
 #include <api/environment/environment_factory.h>
 #include <api/field_trials.h>
-#include "sharertc/peerconnection/src/sharertc_session.h"
+#include "sharertc/peerconnection/src/sharertc_connection.h"
 #include "sharertc/peerconnection/src/sharertc_client.h"
 
 namespace {

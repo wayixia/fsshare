@@ -48,8 +48,9 @@
 #include "api/video_codecs/video_encoder_factory_template_libvpx_vp8_adapter.h"
 #include "api/video_codecs/video_encoder_factory_template_libvpx_vp9_adapter.h"
 #include "api/video_codecs/video_encoder_factory_template_open_h264_adapter.h"
+
 #include "sharertc/peerconnection/src/defaults.h"
-#include "sharertc/peerconnection/src/peer_connection_client.h"
+#include "sharertc/peerconnection/src/sharertc_connection.h"
 #include "json/reader.h"
 #include "json/value.h"
 #include "json/writer.h"
@@ -135,44 +136,44 @@ void ShareRTCClient::onDataReceived( const uint8_t* data, size_t len ) {
 //   DeletePeerConnection();
 // }
 
-bool ShareRTCClient::InitializePeerConnection() {
-  RTC_DCHECK(!peer_connection_factory_);
+// bool ShareRTCClient::InitializePeerConnection() {
+//   RTC_DCHECK(!peer_connection_factory_);
 
-  if (!signaling_thread_) {
-    signaling_thread_ = webrtc::Thread::CreateWithSocketServer();
-    signaling_thread_->Start();
-  }
+//   if (!signaling_thread_) {
+//     signaling_thread_ = webrtc::Thread::CreateWithSocketServer();
+//     signaling_thread_->Start();
+//   }
 
-  webrtc::PeerConnectionFactoryDependencies deps;
-  deps.signaling_thread = signaling_thread_.get();
-  deps.env = env_,
-  deps.audio_encoder_factory = webrtc::CreateBuiltinAudioEncoderFactory();
-  deps.audio_decoder_factory = webrtc::CreateBuiltinAudioDecoderFactory();
-  deps.video_encoder_factory =
-      std::make_unique<webrtc::VideoEncoderFactoryTemplate<
-          webrtc::LibvpxVp8EncoderTemplateAdapter,
-          webrtc::LibvpxVp9EncoderTemplateAdapter,
-          webrtc::OpenH264EncoderTemplateAdapter,
-          webrtc::LibaomAv1EncoderTemplateAdapter>>();
-  deps.video_decoder_factory =
-      std::make_unique<webrtc::VideoDecoderFactoryTemplate<
-          webrtc::LibvpxVp8DecoderTemplateAdapter,
-          webrtc::LibvpxVp9DecoderTemplateAdapter,
-          webrtc::OpenH264DecoderTemplateAdapter,
-          webrtc::Dav1dDecoderTemplateAdapter>>();
-  webrtc::EnableMedia(deps);
+//   webrtc::PeerConnectionFactoryDependencies deps;
+//   deps.signaling_thread = signaling_thread_.get();
+//   deps.env = env_,
+//   deps.audio_encoder_factory = webrtc::CreateBuiltinAudioEncoderFactory();
+//   deps.audio_decoder_factory = webrtc::CreateBuiltinAudioDecoderFactory();
+//   deps.video_encoder_factory =
+//       std::make_unique<webrtc::VideoEncoderFactoryTemplate<
+//           webrtc::LibvpxVp8EncoderTemplateAdapter,
+//           webrtc::LibvpxVp9EncoderTemplateAdapter,
+//           webrtc::OpenH264EncoderTemplateAdapter,
+//           webrtc::LibaomAv1EncoderTemplateAdapter>>();
+//   deps.video_decoder_factory =
+//       std::make_unique<webrtc::VideoDecoderFactoryTemplate<
+//           webrtc::LibvpxVp8DecoderTemplateAdapter,
+//           webrtc::LibvpxVp9DecoderTemplateAdapter,
+//           webrtc::OpenH264DecoderTemplateAdapter,
+//           webrtc::Dav1dDecoderTemplateAdapter>>();
+//   webrtc::EnableMedia(deps);
 
-  peer_connection_factory_ =
-      webrtc::CreateModularPeerConnectionFactory(std::move(deps));
+//   peer_connection_factory_ =
+//       webrtc::CreateModularPeerConnectionFactory(std::move(deps));
 
-  if (!peer_connection_factory_) {
-    //main_wnd_->MessageBox("Error", "Failed to initialize PeerConnectionFactory",
-    //                      true);
-    //DeletePeerConnection();
-    return false;
-  }
+//   if (!peer_connection_factory_) {
+//     //main_wnd_->MessageBox("Error", "Failed to initialize PeerConnectionFactory",
+//     //                      true);
+//     //DeletePeerConnection();
+//     return false;
+//   }
 
-  return true;
+//   return true;
 
   // if (!CreatePeerConnection()) {
   //   //main_wnd_->MessageBox("Error", "CreatePeerConnection failed", true);
@@ -182,9 +183,9 @@ bool ShareRTCClient::InitializePeerConnection() {
   // AddTracks();
 
   // return peer_connection_ != nullptr;
-}
+//}
 
-bool ShareRTCClient::ReinitializePeerConnectionForLoopback() {
+//bool ShareRTCClient::ReinitializePeerConnectionForLoopback() {
   // loopback_ = true;
   // std::vector<webrtc::scoped_refptr<webrtc::RtpSenderInterface>> senders =
   //     peer_connection_->GetSenders();
@@ -204,8 +205,8 @@ bool ShareRTCClient::ReinitializePeerConnectionForLoopback() {
   // peer_connection_factory_->SetOptions(options);
   // return peer_connection_ != nullptr;
 
-  return true;
-}
+//   return true;
+// }
 
 // bool ShareRTCClient::CreatePeerConnection() {
 //   RTC_DCHECK(peer_connection_factory_);
@@ -465,7 +466,7 @@ void ShareRTCClient::Login(const char* signalserver, const char* token ) {
 //   }
 // }
 
-void ShareRTCClient::AddTracks() {
+//void ShareRTCClient::AddTracks() {
   // if (!peer_connection_->GetSenders().empty()) {
   //   return;  // Already added tracks.
   // }
@@ -498,7 +499,7 @@ void ShareRTCClient::AddTracks() {
   // }
 
   // main_wnd_->SwitchToStreamingUI();
-}
+//}
 
 // void ShareRTCClient::DisconnectFromCurrentPeer() {
 //   RTC_LOG(LS_INFO) << __FUNCTION__;

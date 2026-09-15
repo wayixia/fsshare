@@ -24,7 +24,7 @@
 
 typedef std::map<int, std::string> Peers;
 
-struct PeerConnectionClientObserver {
+struct ShareRTCConnectionObserver {
   virtual void OnSignedIn() = 0;  // Called when we're logged on.
   virtual void OnDisconnected() = 0;
   virtual void OnPeerConnected(int id, const std::string& name) = 0;
@@ -34,10 +34,10 @@ struct PeerConnectionClientObserver {
   virtual void OnServerConnectionFailure() = 0;
 
  protected:
-  virtual ~PeerConnectionClientObserver() {}
+  virtual ~ShareRTCConnectionObserver() {}
 };
 
-class PeerConnectionClient : public sigslot::has_slots<> {
+class ShareRTCConnection : public sigslot::has_slots<> {
  public:
   enum State {
     NOT_CONNECTED,
@@ -48,14 +48,14 @@ class PeerConnectionClient : public sigslot::has_slots<> {
     SIGNING_OUT,
   };
 
-  PeerConnectionClient();
-  ~PeerConnectionClient();
+  ShareRTCConnection();
+  ~ShareRTCConnection();
 
   int id() const;
   bool is_connected() const;
   const Peers& peers() const;
 
-  void RegisterObserver(PeerConnectionClientObserver* callback);
+  void RegisterObserver(ShareRTCConnectionObserver* callback);
 
   void Connect(const std::string& server,
                int port,
@@ -113,7 +113,7 @@ class PeerConnectionClient : public sigslot::has_slots<> {
 
   void OnResolveResult(const webrtc::AsyncDnsResolverResult& result);
 
-  PeerConnectionClientObserver* callback_;
+  ShareRTCConnectionObserver* callback_;
   webrtc::SocketAddress server_address_;
   std::unique_ptr<webrtc::AsyncDnsResolverInterface> resolver_;
   std::unique_ptr<webrtc::Socket> control_socket_;

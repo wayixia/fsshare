@@ -8,7 +8,7 @@
  *  be found in the AUTHORS file in the root of the source tree.
  */
 
-#include "sharertc/peerconnection/client/peer_connection_client.h"
+#include "sharertc/peerconnection/src/sharertc_connection.h"
 
 #include <cerrno>
 #include <cstddef>
@@ -21,7 +21,7 @@
 #include "api/async_dns_resolver.h"
 #include "api/task_queue/pending_task_safety_flag.h"
 #include "api/units/time_delta.h"
-#include "examples/peerconnection/client/defaults.h"
+#include "sharertc/peerconnection/src/defaults.h"
 #include "rtc_base/async_dns_resolver.h"
 #include "rtc_base/checks.h"
 #include "rtc_base/logging.h"
@@ -44,48 +44,48 @@ webrtc::Socket* CreateClientSocket(int family) {
 
 }  // namespace
 
-PeerConnectionClient::PeerConnectionClient()
+ShareRTCConnection::ShareRTCConnection()
     : callback_(nullptr),
       resolver_(nullptr),
       state_(NOT_CONNECTED),
       my_id_(-1) {}
 
-PeerConnectionClient::~PeerConnectionClient() = default;
+ShareRTCConnection::~ShareRTCConnection() = default;
 
-void PeerConnectionClient::InitSocketSignals() {
+void ShareRTCConnection::InitSocketSignals() {
   RTC_DCHECK(control_socket_.get() != nullptr);
   RTC_DCHECK(hanging_get_.get() != nullptr);
   control_socket_->SignalCloseEvent.connect(this,
-                                            &PeerConnectionClient::OnClose);
-  hanging_get_->SignalCloseEvent.connect(this, &PeerConnectionClient::OnClose);
+                                            &ShareRTCConnection::OnClose);
+  hanging_get_->SignalCloseEvent.connect(this, &ShareRTCConnection::OnClose);
   control_socket_->SignalConnectEvent.connect(this,
-                                              &PeerConnectionClient::OnConnect);
+                                              &ShareRTCConnection::OnConnect);
   hanging_get_->SignalConnectEvent.connect(
-      this, &PeerConnectionClient::OnHangingGetConnect);
-  control_socket_->SignalReadEvent.connect(this, &PeerConnectionClient::OnRead);
+      this, &ShareRTCConnection::OnHangingGetConnect);
+  control_socket_->SignalReadEvent.connect(this, &ShareRTCConnection::OnRead);
   hanging_get_->SignalReadEvent.connect(
-      this, &PeerConnectionClient::OnHangingGetRead);
+      this, &ShareRTCConnection::OnHangingGetRead);
 }
 
-int PeerConnectionClient::id() const {
+int ShareRTCConnection::id() const {
   return my_id_;
 }
 
-bool PeerConnectionClient::is_connected() const {
+bool ShareRTCConnection::is_connected() const {
   return my_id_ != -1;
 }
 
-const Peers& PeerConnectionClient::peers() const {
+const Peers& ShareRTCConnection::peers() const {
   return peers_;
 }
 
-void PeerConnectionClient::RegisterObserver(
-    PeerConnectionClientObserver* callback) {
+void ShareRTCConnection::RegisterObserver(
+    ShareRTCConnectionObserver* callback) {
   RTC_DCHECK(!callback_);
   callback_ = callback;
 }
 
-void PeerConnectionClient::Connect(const std::string& server,
+void ShareRTCConnection::Connect(const std::string& server,
                                    int port,
                                    const std::string& client_name) {
   RTC_DCHECK(!server.empty());
@@ -122,7 +122,7 @@ void PeerConnectionClient::Connect(const std::string& server,
   }
 }
 
-void PeerConnectionClient::OnResolveResult(
+void ShareRTCConnection::OnResolveResult(
     const webrtc::AsyncDnsResolverResult& result) {
   if (result.GetError() != 0) {
     callback_->OnServerConnectionFailure();
@@ -139,7 +139,7 @@ void PeerConnectionClient::OnResolveResult(
   DoConnect();
 }
 
-void PeerConnectionClient::DoConnect() {
+void ShareRTCConnection::DoConnect() {
   control_socket_.reset(CreateClientSocket(server_address_.ipaddr().family()));
   hanging_get_.reset(CreateClientSocket(server_address_.ipaddr().family()));
   InitSocketSignals();
@@ -156,7 +156,7 @@ void PeerConnectionClient::DoConnect() {
   }
 }
 
-bool PeerConnectionClient::SendToPeer(int peer_id, const std::string& message) {
+bool ShareRTCConnection::SendToPeer(int peer_id, const std::string& message) {
   if (state_ != CONNECTED)
     return false;
 
@@ -177,16 +177,16 @@ bool PeerConnectionClient::SendToPeer(int peer_id, const std::string& message) {
   return ConnectControlSocket();
 }
 
-bool PeerConnectionClient::SendHangUp(int peer_id) {
+bool ShareRTCConnection::SendHangUp(int peer_id) {
   return SendToPeer(peer_id, kByeMessage);
 }
 
-bool PeerConnectionClient::IsSendingMessage() {
+bool ShareRTCConnection::IsSendingMessage() {
   return state_ == CONNECTED &&
          control_socket_->GetState() != webrtc::Socket::CS_CLOSED;
 }
 
-bool PeerConnectionClient::SignOut() {
+bool ShareRTCConnection::SignOut() {
   if (state_ == NOT_CONNECTED || state_ == SIGNING_OUT)
     return true;
 
@@ -213,7 +213,7 @@ bool PeerConnectionClient::SignOut() {
   return true;
 }
 
-void PeerConnectionClient::Close() {
+void ShareRTCConnection::Close() {
   control_socket_->Close();
   hanging_get_->Close();
   onconnect_data_.clear();
@@ -223,7 +223,7 @@ void PeerConnectionClient::Close() {
   state_ = NOT_CONNECTED;
 }
 
-bool PeerConnectionClient::ConnectControlSocket() {
+bool ShareRTCConnection::ConnectControlSocket() {
   RTC_DCHECK(control_socket_->GetState() == webrtc::Socket::CS_CLOSED);
   int err = control_socket_->Connect(server_address_);
   if (err == SOCKET_ERROR) {
@@ -233,14 +233,14 @@ bool PeerConnectionClient::ConnectControlSocket() {
   return true;
 }
 
-void PeerConnectionClient::OnConnect(webrtc::Socket* socket) {
+void ShareRTCConnection::OnConnect(webrtc::Socket* socket) {
   RTC_DCHECK(!onconnect_data_.empty());
   size_t sent = socket->Send(onconnect_data_.c_str(), onconnect_data_.length());
   RTC_DCHECK(sent == onconnect_data_.length());
   onconnect_data_.clear();
 }
 
-void PeerConnectionClient::OnHangingGetConnect(webrtc::Socket* socket) {
+void ShareRTCConnection::OnHangingGetConnect(webrtc::Socket* socket) {
   char buffer[1024];
   snprintf(buffer, sizeof(buffer), "GET /wait?peer_id=%i HTTP/1.0\r\n\r\n",
            my_id_);
@@ -249,7 +249,7 @@ void PeerConnectionClient::OnHangingGetConnect(webrtc::Socket* socket) {
   RTC_DCHECK(sent == len);
 }
 
-void PeerConnectionClient::OnMessageFromPeer(int peer_id,
+void ShareRTCConnection::OnMessageFromPeer(int peer_id,
                                              const std::string& message) {
   if (message.length() == (sizeof(kByeMessage) - 1) &&
       message.compare(kByeMessage) == 0) {
@@ -259,7 +259,7 @@ void PeerConnectionClient::OnMessageFromPeer(int peer_id,
   }
 }
 
-bool PeerConnectionClient::GetHeaderValue(const std::string& data,
+bool ShareRTCConnection::GetHeaderValue(const std::string& data,
                                           size_t eoh,
                                           const char* header_pattern,
                                           size_t* value) {
@@ -272,7 +272,7 @@ bool PeerConnectionClient::GetHeaderValue(const std::string& data,
   return false;
 }
 
-bool PeerConnectionClient::GetHeaderValue(const std::string& data,
+bool ShareRTCConnection::GetHeaderValue(const std::string& data,
                                           size_t eoh,
                                           const char* header_pattern,
                                           std::string* value) {
@@ -289,7 +289,7 @@ bool PeerConnectionClient::GetHeaderValue(const std::string& data,
   return false;
 }
 
-bool PeerConnectionClient::ReadIntoBuffer(webrtc::Socket* socket,
+bool ShareRTCConnection::ReadIntoBuffer(webrtc::Socket* socket,
                                           std::string* data,
                                           size_t* content_length) {
   char buffer[0xffff];
@@ -327,7 +327,7 @@ bool PeerConnectionClient::ReadIntoBuffer(webrtc::Socket* socket,
   return ret;
 }
 
-void PeerConnectionClient::OnRead(webrtc::Socket* socket) {
+void ShareRTCConnection::OnRead(webrtc::Socket* socket) {
   size_t content_length = 0;
   if (ReadIntoBuffer(socket, &control_data_, &content_length)) {
     size_t peer_id = 0, eoh = 0;
@@ -379,7 +379,7 @@ void PeerConnectionClient::OnRead(webrtc::Socket* socket) {
   }
 }
 
-void PeerConnectionClient::OnHangingGetRead(webrtc::Socket* socket) {
+void ShareRTCConnection::OnHangingGetRead(webrtc::Socket* socket) {
   RTC_LOG(LS_INFO) << __FUNCTION__;
   size_t content_length = 0;
   if (ReadIntoBuffer(socket, &notification_data_, &content_length)) {
@@ -422,7 +422,7 @@ void PeerConnectionClient::OnHangingGetRead(webrtc::Socket* socket) {
   }
 }
 
-bool PeerConnectionClient::ParseEntry(const std::string& entry,
+bool ShareRTCConnection::ParseEntry(const std::string& entry,
                                       std::string* name,
                                       int* id,
                                       bool* connected) {
@@ -444,7 +444,7 @@ bool PeerConnectionClient::ParseEntry(const std::string& entry,
   return !name->empty();
 }
 
-int PeerConnectionClient::GetResponseStatus(const std::string& response) {
+int ShareRTCConnection::GetResponseStatus(const std::string& response) {
   int status = -1;
   size_t pos = response.find(' ');
   if (pos != std::string::npos)
@@ -452,7 +452,7 @@ int PeerConnectionClient::GetResponseStatus(const std::string& response) {
   return status;
 }
 
-bool PeerConnectionClient::ParseServerResponse(const std::string& response,
+bool ShareRTCConnection::ParseServerResponse(const std::string& response,
                                                size_t content_length,
                                                size_t* peer_id,
                                                size_t* eoh) {
@@ -477,7 +477,7 @@ bool PeerConnectionClient::ParseServerResponse(const std::string& response,
   return true;
 }
 
-void PeerConnectionClient::OnClose(webrtc::Socket* socket, int err) {
+void ShareRTCConnection::OnClose(webrtc::Socket* socket, int err) {
   RTC_LOG(LS_INFO) << __FUNCTION__;
 
   socket->Close();

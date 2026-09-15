@@ -6,7 +6,6 @@
 int main() {
   WebSocketClient::Initialize();
   SimpleThread net_thread("WebSocketNetThread");
-
   WebSocketClient wssock(&net_thread); // 传入 nullptr 或实际的 net_thread 指针
   // client.on_state_change = [&client](WsClientState state) {
   //   const char* sstate = "unknown";
@@ -42,9 +41,6 @@ int main() {
   // };
   
   IShareRTCClient* cli = CreateShareRTCClient(&wssock);
-  
-  
-  
   net_thread.Start(); // 启动线程
 
 #if 0
@@ -90,6 +86,10 @@ int main() {
   //std::getline(std::cin, url);
   url = "ws://localhost:8090/signalingserver";
   cli->Login( url.c_str(), "localhost");
+  
+  
+  
+  IShareRTCConnector 
   
   while(1) {
     std::this_thread::sleep_for(std::chrono::milliseconds(50));

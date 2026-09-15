@@ -1,5 +1,5 @@
-#ifndef SHARERTCCLIENT_H
-#define SHARERTCCLIENT_H
+#ifndef SHARERTC_H
+#define SHARERTC_H
 
 #include <memory>
 #include <string>
@@ -82,6 +82,25 @@ public:
 // };
 
 
+class IShareRTCChannelObserver {
+public:
+  virtual ~IShareRTCChannelObserver() = default;
+  virtual void OnOpen() = 0;
+  virtual void OnClose() = 0;
+};
+
+
+// class IShareRTCChannel {
+// public:
+//   virtual ~IShareRTCChannel() = default;
+//   virtual int Send( const uint8_t* data, size_t len) = 0;
+// };
+
+// class IShareRTCConnection {
+// public:
+//   virtual ~IShareRTCConnection() = default;
+// };
+
 
 // ==================== RTC 客户端控制接口 ====================
 /**
@@ -96,11 +115,43 @@ public:
 
     virtual void Login(const char* signalserver, const char* token ) = 0;
     virtual void DisconnectFromServer() = 0;
-    virtual void ConnectToPeer(int peer_id) = 0;
     virtual void DisconnectPeer(int peer_id) = 0;
     virtual void Logout() = 0;
 };
 
+
+
+class IShareRTCControlObserver {
+public:
+  virtual ~IShareRTCControlObserver() = default;
+  virtual void OnStateChange() = 0;
+};
+
+
+class IShareRTCControl {
+public:
+  virtual ~IShareRTCControl() = default;
+
+  /** \brief 设置外部状态监听 
+   * 
+   */
+  virtual void SetObserver( IShareRTCChannelObserver* ) = 0;
+
+  /** \brief 登录API服务器，获取登录信令服务器token，用于链接客户端 
+   *  
+   */
+  virtual int Connect( const char* url, const char* usertoken ) = 0;
+
+  /** \brief 创建Channel 返回ChannelID
+   * 
+   */
+  virtual int CreateChannel( const char* label, IShareRTCChannelObserver* );
+
+  /** \brief 发送channel数据
+   * 
+   */
+  virtual int Send( int channelid, const uint8_t* data, size_t len);
+};
 
 
 
@@ -124,10 +175,26 @@ SHARERTCCLIENT_API IShareRTCClient* CreateShareRTCClient( ISignalSocket* sock );
  * @brief 销毁 IShareRTCClient 实例
  * @param pClient 由 CreateShareRTCClient 返回的指针
  */
-SHARERTCCLIENT_API void DestroyShareRTCClient(IShareRTCClient* pClient);
+SHARERTCCLIENT_API void DestroyShareRTCClient(IShareRTCClient* p);
+
+/**
+ * @brief 创建 IShareRTCControl 实例
+ * @param pSignal 信令连接对象指针（由调用者创建并管理生命周期，必须保持有效）
+ * @return 成功返回对象指针，失败返回 nullptr
+ */
+SHARERTCCLIENT_API IShareRTCClient* CreateShareRTCControl( ISignalSocket* sock );
+
+/**
+ * @brief 销毁 IShareRTCControl 实例
+ * @param pClient 由 CreateShareRTCControl 返回的指针
+ */
+SHARERTCCLIENT_API void DestroyShareRTCControl(IShareRTCControl* p);
+
+
+
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif // SHARERTCCLIENT_H
+#endif // SHARERTC_H

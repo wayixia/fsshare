@@ -27,7 +27,7 @@
 #include "api/scoped_refptr.h"
 #include "rtc_base/thread.h"
 
-#include "sharertc/peerconnection/src/sharertc_session.h"
+#include "sharertc/peerconnection/src/sharertc_connection.h"
 #include "sharertc/peerconnection/src/sharertc_signal_connection.h"
 #include "sharertc/peerconnection/include/sharertc/sharertc.h"
 
@@ -51,12 +51,11 @@ public:
 
 
 protected:
-  bool InitializePeerConnection();
-  bool ReinitializePeerConnectionForLoopback();
-  ShareRTCSession* OnCreateRTCSession( const char* ice_servers, const char* username, const char* secpass );
+  // bool InitializePeerConnection();
+  // bool ReinitializePeerConnectionForLoopback();
+  ShareRTCConnection* OnAccept( const char* ice_servers, const char* username, const char* secpass );
   //void DeletePeerConnection();
-  void EnsureStreamingUI();
-  void AddTracks();
+  //void AddTracks();
 
   //
   // PeerConnectionObserver implementation.
@@ -120,7 +119,6 @@ protected:
 
     virtual void Login(const char* signalserver, const char* token ) override;
     virtual void DisconnectFromServer() override {}
-    virtual void ConnectToPeer(int peer_id) override {}
     virtual void DisconnectPeer(int peer_id) override {}
     virtual void Logout() override {}
 
