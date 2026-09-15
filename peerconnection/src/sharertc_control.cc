@@ -436,10 +436,10 @@ bool ShareRTCControl::ReinitializePeerConnectionForLoopback() {
 // MainWndCallback implementation.
 //
 
-void ShareRTCControl::Login(const char* signalserver, const char* token ) {
-  // 目前简单处理， 直接链接信令服务器
-  socket_->connect(signalserver, token);
-}
+// void ShareRTCControl::Login(const char* signalserver, const char* token ) {
+//   // 目前简单处理， 直接链接信令服务器
+//   socket_->connect(signalserver, token);
+// }
 
 // void ShareRTCControl::DisconnectFromServer() {
 //   if (client_->is_connected())

@@ -26,10 +26,10 @@
 #include "api/rtp_receiver_interface.h"
 #include "api/scoped_refptr.h"
 #include "rtc_base/thread.h"
-
+#include "sharertc/peerconnection/include/sharertc/sharertc.h"
 #include "sharertc/peerconnection/src/sharertc_connection.h"
 #include "sharertc/peerconnection/src/sharertc_signal_connection.h"
-#include "sharertc/peerconnection/include/sharertc/sharertc.h"
+
 
 
 
@@ -49,6 +49,38 @@ public:
   void onError(int code, const char* msg) override {}
   void onDataReceived(const uint8_t* data, size_t len) override;
 
+public:
+  /** \brief 设置外部状态监听 
+   * 
+   */
+  virtual void SetObserver( IShareRTCChannelObserver* ) override
+  {
+
+  }
+
+  /** \brief 登录API服务器，获取登录信令服务器token，用于链接客户端 
+   *  
+   */
+  virtual int Connect( const char* url, const char* usertoken ) override
+  {
+    return 0;
+  }
+
+  /** \brief 创建Channel 返回ChannelID
+   * 
+   */
+  virtual int CreateChannel( const char* label, IShareRTCChannelObserver* ) override
+  {
+    return 0;
+  }
+
+  /** \brief 发送channel数据
+   * 
+   */
+  virtual int Send( int channelid, const uint8_t* data, size_t len) override
+  {
+    return 0;
+  }
 
 public:
   ShareRTCConnection* CreateConnection(const char* iceservers );
@@ -119,11 +151,11 @@ protected:
 //   void OnFailure(webrtc::RTCError error) override;
 
 
-    virtual void Login(const char* signalserver, const char* token ) override;
-    virtual void DisconnectFromServer() override {}
-    virtual void ConnectToPeer(int peer_id)  {}
-    virtual void DisconnectPeer(int peer_id) override {}
-    virtual void Logout() override {}
+    // virtual void Login(const char* signalserver, const char* token ) override;
+    // virtual void DisconnectFromServer() override {}
+    // virtual void ConnectToPeer(int peer_id)  {}
+    // virtual void DisconnectPeer(int peer_id) override {}
+    // virtual void Logout() override {}
 
 
  protected:
