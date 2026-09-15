@@ -145,12 +145,12 @@ public:
   /** \brief 创建Channel 返回ChannelID
    * 
    */
-  virtual int CreateChannel( const char* label, IShareRTCChannelObserver* );
+  virtual int CreateChannel( const char* label, IShareRTCChannelObserver* ) = 0;
 
   /** \brief 发送channel数据
    * 
    */
-  virtual int Send( int channelid, const uint8_t* data, size_t len);
+  virtual int Send( int channelid, const uint8_t* data, size_t len) = 0;
 };
 
 

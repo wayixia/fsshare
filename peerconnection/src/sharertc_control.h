@@ -53,7 +53,7 @@ public:
   /** \brief 设置外部状态监听 
    * 
    */
-  virtual void SetObserver( IShareRTCChannelObserver* ) override
+  void SetObserver( IShareRTCChannelObserver* ) override
   {
 
   }
@@ -61,7 +61,7 @@ public:
   /** \brief 登录API服务器，获取登录信令服务器token，用于链接客户端 
    *  
    */
-  virtual int Connect( const char* url, const char* usertoken ) override
+  int Connect( const char* url, const char* usertoken ) override
   {
     return 0;
   }
@@ -69,7 +69,7 @@ public:
   /** \brief 创建Channel 返回ChannelID
    * 
    */
-  virtual int CreateChannel( const char* label, IShareRTCChannelObserver* ) override
+  int CreateChannel( const char* label, IShareRTCChannelObserver* ) override
   {
     return 0;
   }
@@ -77,7 +77,7 @@ public:
   /** \brief 发送channel数据
    * 
    */
-  virtual int Send( int channelid, const uint8_t* data, size_t len) override
+  int Send( int channelid, const uint8_t* data, size_t len) override
   {
     return 0;
   }
