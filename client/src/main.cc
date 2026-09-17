@@ -88,8 +88,13 @@ int main() {
   cli->Login( url.c_str(), "localhost");
   
   
+  SimpleThread net_thread2("WebSocketNetThread");
+  WebSocketClient wssock2(&net_thread2); // 传入 nullptr 或实际的 net_thread 指针
+  IShareRTCControl* ctrl = CreateShareRTCControl(&wssock2);
+  net_thread2.Start(); // 启动线程
   
-  IShareRTCConnector 
+  ctrl->Connect("https://localhost:8090/abc", "abc");
+  
   
   while(1) {
     std::this_thread::sleep_for(std::chrono::milliseconds(50));

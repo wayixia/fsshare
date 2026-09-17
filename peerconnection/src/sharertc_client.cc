@@ -94,13 +94,14 @@ class DummySetSessionDescriptionObserver
 }  // namespace
 
 ShareRTCClient::ShareRTCClient(const webrtc::Environment& env, ISignalSocket* signalsock)
-  : peer_id_(-1)
-  , loopback_(false)
-  , env_(env)
-  , signal_connection_(std::bind( &ShareRTCClient::SendMessage, this, std::placeholders::_1) )
-  , socket_(signalsock)
+: ShareRTCBase( env, signalsock)
+  // : peer_id_(-1)
+  // , loopback_(false)
+  // , env_(env)
+  // , signal_connection_(std::bind( &ShareRTCClient::SendMessage, this, std::placeholders::_1) )
+  // , socket_(signalsock)
 { 
-  socket_->setObserver(this);
+  //socket_->setObserver(this);
   ///client_->RegisterObserver(this);
   //main_wnd->RegisterObserver(this);
 }
@@ -109,23 +110,23 @@ ShareRTCClient::~ShareRTCClient() {
   //RTC_DCHECK(!peer_connection_);
 }
 
-void ShareRTCClient::onConnected() {
-  signal_connection_.IdentifySelf();
-}
+// void ShareRTCClient::onConnected() {
+//   signal_connection_.IdentifySelf();
+// }
 
-void ShareRTCClient::onDataReceived( const uint8_t* data, size_t len ) {
-  if( !data || len == 0 )
-  {
-    std::cout << "[signalconnection] invalid data or len";
-    return;
-  }
+// void ShareRTCClient::onDataReceived( const uint8_t* data, size_t len ) {
+//   if( !data || len == 0 )
+//   {
+//     std::cout << "[signalconnection] invalid data or len";
+//     return;
+//   }
 
-  std::string err;
-  std::string msg((const char*)data, len);
-  if( !signal_connection_.HandleMessage( msg, err) ) {
-      std::cout << "[wsclient] handle message failed ->" << msg << std::endl;
-  }
-}
+//   std::string err;
+//   std::string msg((const char*)data, len);
+//   if( !signal_connection_.HandleMessage( msg, err) ) {
+//       std::cout << "[wsclient] handle message failed ->" << msg << std::endl;
+//   }
+// }
 
 // bool ShareRTCClient::connection_active() const {
 //   return peer_connection_ != nullptr;
@@ -610,16 +611,16 @@ void ShareRTCClient::Login(const char* signalserver, const char* token ) {
 //   RTC_LOG(LS_ERROR) << ToString(error.type()) << ": " << error.message();
 // }
 
-int ShareRTCClient::SendMessage(const std::string& json_object) {
+// int ShareRTCClient::SendMessage(const std::string& json_object) {
 
-  assert(socket_ != nullptr);
-  if( !socket_ || !socket_->isConnected() ) {
-    return -1;
-  }
+//   assert(socket_ != nullptr);
+//   if( !socket_ || !socket_->isConnected() ) {
+//     return -1;
+//   }
 
-  if( !socket_->send( (const uint8_t*)json_object.c_str(), json_object.size()) ) {
-    return -2;
-  }
+//   if( !socket_->send( (const uint8_t*)json_object.c_str(), json_object.size()) ) {
+//     return -2;
+//   }
 
-  return 0;
-}
+//   return 0;
+// }

@@ -30,25 +30,19 @@
 #include "sharertc/peerconnection/src/sharertc_connection.h"
 #include "sharertc/peerconnection/src/sharertc_signal_connection.h"
 #include "sharertc/peerconnection/include/sharertc/sharertc.h"
+#include "sharertc/peerconnection/src/sharertc_base.h"
 
 
 
 class ShareRTCClient 
-: public IShareRTCClient
-, public ISignalSocketObserver
+: public ShareRTCBase
+, public IShareRTCClient
 //: public webrtc::PeerConnectionObserver
 //, public webrtc::CreateSessionDescriptionObserver
 {
 public:
   ShareRTCClient(const webrtc::Environment& env, ISignalSocket* signalsocket );
   ~ShareRTCClient();
-
-public:
-  void onConnected() override;
-  void onDisconnected() override {}
-  void onError(int code, const char* msg) override {}
-  void onDataReceived(const uint8_t* data, size_t len) override;
-
 
 protected:
   // bool InitializePeerConnection();
@@ -117,27 +111,13 @@ protected:
 //   void OnFailure(webrtc::RTCError error) override;
 
 
-    virtual void Login(const char* signalserver, const char* token ) override;
-    virtual void DisconnectFromServer() override {}
-    virtual void DisconnectPeer(int peer_id) override {}
-    virtual void Logout() override {}
+  virtual void Login(const char* signalserver, const char* token ) override;
+  virtual void DisconnectFromServer() override {}
+  virtual void DisconnectPeer(int peer_id) override {}
+  virtual void Logout() override {}
 
-
- protected:
-  // Send a message to the remote peer.
-  int SendMessage(const std::string& json_object);
-
-  int peer_id_;
-  bool loopback_;
-  const webrtc::Environment env_;
-  std::unique_ptr<webrtc::Thread> signaling_thread_;
+protected:
   //webrtc::scoped_refptr<webrtc::PeerConnectionInterface> peer_connection_;
-  webrtc::scoped_refptr<webrtc::PeerConnectionFactoryInterface> peer_connection_factory_;
-  std::deque<std::string*> pending_messages_;
-  std::string server_;
-
-  ShareRTCSignalConnection signal_connection_;
-  ISignalSocket* socket_;
 };
 
 #endif  // EXAMPLES_PEERCONNECTION_CLIENT_CONDUCTOR_H_

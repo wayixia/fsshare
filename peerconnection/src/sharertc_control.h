@@ -8,8 +8,8 @@
  *  be found in the AUTHORS file in the root of the source tree.
  */
 
-#ifndef SHARERTC_CLIENT_H_
-#define SHARERTC_CLIENT_H_
+#ifndef SHARERTC_CONTROL_H_
+#define SHARERTC_CONTROL_H_
 
 #include <deque>
 #include <memory>
@@ -29,25 +29,20 @@
 #include "sharertc/peerconnection/include/sharertc/sharertc.h"
 #include "sharertc/peerconnection/src/sharertc_connection.h"
 #include "sharertc/peerconnection/src/sharertc_signal_connection.h"
+#include "sharertc/peerconnection/src/sharertc_base.h"
 
 
 
 
 class ShareRTCControl
-: public IShareRTCControl
-, public ISignalSocketObserver
+: public ShareRTCBase
+, public IShareRTCControl
 //: public webrtc::PeerConnectionObserver
 //, public webrtc::CreateSessionDescriptionObserver
 {
 public:
   ShareRTCControl(const webrtc::Environment& env, ISignalSocket* signalsocket );
   ~ShareRTCControl();
-
-public:
-  void onConnected() override;
-  void onDisconnected() override {}
-  void onError(int code, const char* msg) override {}
-  void onDataReceived(const uint8_t* data, size_t len) override;
 
 public:
   /** \brief 设置外部状态监听 
@@ -61,10 +56,8 @@ public:
   /** \brief 登录API服务器，获取登录信令服务器token，用于链接客户端 
    *  
    */
-  int Connect( const char* url, const char* usertoken ) override
-  {
-    return 0;
-  }
+  int Connect( const char* url, const char* usertoken ) override;
+
 
   /** \brief 创建Channel 返回ChannelID
    * 
@@ -156,22 +149,6 @@ protected:
     // virtual void ConnectToPeer(int peer_id)  {}
     // virtual void DisconnectPeer(int peer_id) override {}
     // virtual void Logout() override {}
-
-
- protected:
-  // Send a message to the remote peer.
-  int SendMessage(const std::string& json_object);
-
-  int peer_id_;
-  bool loopback_;
-  const webrtc::Environment env_;
-  std::unique_ptr<webrtc::Thread> signaling_thread_;
-  webrtc::scoped_refptr<webrtc::PeerConnectionFactoryInterface> peer_connection_factory_;
-  std::deque<std::string*> pending_messages_;
-  std::string server_;
-
-  ShareRTCSignalConnection signal_connection_;
-  ISignalSocket* socket_;
 };
 
 #endif  // EXAMPLES_PEERCONNECTION_CLIENT_CONDUCTOR_H_
