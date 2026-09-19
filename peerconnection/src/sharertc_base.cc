@@ -97,8 +97,8 @@ ShareRTCBase::ShareRTCBase(const webrtc::Environment& env, ISignalSocket* signal
   : peer_id_(-1)
   , loopback_(false)
   , env_(env)
-  , signal_connection_(std::bind( &ShareRTCBase::SendMessage, this, std::placeholders::_1) )
   , socket_(signalsock)
+  , signal_connection_(std::bind( &ShareRTCBase::SendMessage, this, std::placeholders::_1) )
 { 
   socket_->setObserver(this);
   ///client_->RegisterObserver(this);

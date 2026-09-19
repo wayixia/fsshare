@@ -58,14 +58,15 @@ public:
   int peer_id_;
   bool loopback_;
   const webrtc::Environment env_;
+  ISignalSocket* socket_;
   std::unique_ptr<webrtc::Thread> signaling_thread_;
+  ShareRTCSignalConnection signal_connection_;
+  std::string signal_server_addr_;
   //webrtc::scoped_refptr<webrtc::PeerConnectionInterface> peer_connection_;
   webrtc::scoped_refptr<webrtc::PeerConnectionFactoryInterface> peer_connection_factory_;
   std::deque<std::string*> pending_messages_;
-  std::string server_;
 
-  ShareRTCSignalConnection signal_connection_;
-  ISignalSocket* socket_;
+  std::map< int, std::unique_ptr< ShareRTCConnection > > peer_connections_;
 };
 
 #endif  // EXAMPLES_PEERCONNECTION_CLIENT_CONDUCTOR_H_

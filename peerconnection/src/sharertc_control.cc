@@ -123,14 +123,10 @@ int ShareRTCControl::Connect(const char* peerurl, const char* token) {
   std::ostringstream signalserver_url;
   signalserver_url << "ws://" << r.value.host() << ":" << r.value.port() << "/signalingserver";
   ShareRTCBase::Login(signalserver_url.str().c_str(), token);
-  //socket_->connect( signalserver_url.str().c_str(), token);
 
   return 0;
 }
 
-// bool ShareRTCControl::connection_active() const {
-//   return peer_connection_ != nullptr;
-// }
 
 // void ShareRTCControl::Close() {
 //   client_->SignOut();
