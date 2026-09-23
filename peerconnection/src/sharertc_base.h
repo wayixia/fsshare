@@ -44,6 +44,9 @@ public:
 
 public:
   void Login(const char* signalserver, const char* token );
+  void Logout();
+  const char* SignalServerAddr() const;
+  bool IsSignalServerOK();
 
 public:
   void onConnected() override;
@@ -55,8 +58,7 @@ public:
   // Send a message to the remote peer.
   int SendMessage(const std::string& json_object);
 
-  int peer_id_;
-  bool loopback_;
+  std::string peer_id_;
   const webrtc::Environment env_;
   ISignalSocket* socket_;
   std::unique_ptr<webrtc::Thread> signaling_thread_;
@@ -69,4 +71,4 @@ public:
   std::map< int, std::unique_ptr< ShareRTCConnection > > peer_connections_;
 };
 
-#endif  // EXAMPLES_PEERCONNECTION_CLIENT_CONDUCTOR_H_
+#endif  // SHARERTC_BASE_H_

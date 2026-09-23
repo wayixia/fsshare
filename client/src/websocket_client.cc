@@ -77,9 +77,6 @@ bool WebSocketClient::ConnectUrl(const std::string& url, const std::string& toke
 bool WebSocketClient::DoConnectUrl(const std::string& url, const std::string& token) {
   //RTC_DCHECK_RUN_ON(net_thread_);
   if (!impl_->ParseUrl(url)) {
-//    if(on_error) {
-//      on_error(-100);
-//    }
     OnError(-100);
     return false;
   }
@@ -107,7 +104,6 @@ bool WebSocketClient::DoConnectUrl(const std::string& url, const std::string& to
   impl_->context = lws_create_context(&info);
   if (!impl_->context) {
     impl_->Log("lws create context failed");
-    //if(on_error) on_error(-101);
     OnError(-101);
     return false;
   }

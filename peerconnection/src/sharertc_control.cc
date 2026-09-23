@@ -110,6 +110,13 @@ ShareRTCControl::~ShareRTCControl() {
 
 
 int ShareRTCControl::Connect(const char* peerurl, const char* token) {
+
+  if( inited_ )
+  {
+    // has inited
+    return -3;
+  }
+
   if( !peerurl || !token )
   {
     return -1;
@@ -120,18 +127,27 @@ int ShareRTCControl::Connect(const char* peerurl, const char* token) {
     return -2;
   }
 
-  std::ostringstream signalserver_url;
-  signalserver_url << "ws://" << r.value.host() << ":" << r.value.port() << "/signalingserver";
-  ShareRTCBase::Login(signalserver_url.str().c_str(), token);
+  // Save peer info
+  peer_id_ = r.value.peerid();
+  signal_server_addr_ = r.value.host();
+
+  if( !IsSignalServerOK() )
+  {
+    std::ostringstream signalserver_url;
+    signalserver_url << "ws://" << signal_server_addr_ << ":" << r.value.port() << "/signalingserver";
+    ShareRTCBase::Login(signalserver_url.str().c_str(), token);
+  }
+
+  inited_ = true;
 
   return 0;
 }
 
 
-// void ShareRTCControl::Close() {
-//   client_->SignOut();
-//   DeletePeerConnection();
-// }
+void ShareRTCControl::Disconnect() {
+  Logout();
+  // clear peer connections
+}
 
 bool ShareRTCControl::InitializePeerConnection() {
   RTC_DCHECK(!peer_connection_factory_);

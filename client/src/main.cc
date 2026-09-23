@@ -44,42 +44,7 @@ int main() {
   net_thread.Start(); // 启动线程
 
 #if 0
-  std::string input;
-  while (std::getline(std::cin, input)) {
 
-    if (input == "quit") {
-      done = true;
-    } else if (input == "help") {
-      std::cout << "\nCommand List:\n"
-        << "help: Display this help text\n"
-        << "quit: Exit the program\n"
-        << std::endl;
-    } else if (input == "connect") {
-        std::string url;
-        //std::cout << "Enter WebSocket URL (ws:// or wss://): ";
-        //std::getline(std::cin, url);
-        url = "ws://localhost:8090/signalingserver";
-        if (client.ConnectUrl(url)) {
-            std::cout << "Connecting to " << url << "..." << std::endl;
-        } else {
-            std::cout << "Failed to initiate connection." << std::endl;
-        }
-    } else if (input == "send") {
-        std::string message;
-        std::cout << "Enter message to send: ";
-        std::getline(std::cin, message);
-        if (client.SendText(message)) {
-            std::cout << "Message sent: " << message << std::endl;
-        } else {
-            std::cout << "Failed to send message." << std::endl;
-        }
-    } else if (input == "close") {
-        client.Close();
-        std::cout << "Connection closed." << std::endl;
-    } else {
-      std::cout << "Unrecognized Command" << std::endl;
-    } 
-  }
 #else
   std::string url;
   //std::cout << "Enter WebSocket URL (ws:// or wss://): ";
@@ -93,13 +58,35 @@ int main() {
   IShareRTCControl* ctrl = CreateShareRTCControl(&wssock2);
   net_thread2.Start(); // 启动线程
   
-  ctrl->Connect("https://localhost:8090/abc", "abc");
   
-  
-  while(1) {
-    std::this_thread::sleep_for(std::chrono::milliseconds(50));
-  }
+//  while(1) {
+//    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+//  }
 #endif
+  
+  
+  std::string input;
+  while (std::getline(std::cin, input)) {
+
+    if (input == "quit") {
+      break;
+    } else if (input == "help") {
+      std::cout << "\nCommand List:\n"
+        << "help: Display this help text\n"
+        << "quit: Exit the program\n"
+        << std::endl;
+    } else if (input == "connect") {
+      ctrl->Connect("https://localhost:8090/abc", "abc");
+    } else if (input == "send") {
+        std::string message;
+        
+    } else if (input == "close") {
+        //std::cout << "Connection closed." << std::endl;
+      
+    } else {
+      std::cout << "Unrecognized Command" << std::endl;
+    }
+  }
   
   WebSocketClient::Uninitialize();
   net_thread.Stop(); // 停止线程

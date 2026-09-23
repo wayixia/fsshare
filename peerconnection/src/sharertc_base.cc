@@ -442,10 +442,19 @@ void ShareRTCBase::Login(const char* signalserver, const char* token ) {
   socket_->connect(signalserver, token);
 }
 
-// void ShareRTCBase::DisconnectFromServer() {
-//   if (client_->is_connected())
-//     client_->SignOut();
-// }
+void ShareRTCBase::Logout() {
+  socket_->disconnect();
+}
+
+const char* ShareRTCBase::SignalServerAddr() const
+{
+  return signal_server_addr_.c_str();
+}
+
+bool ShareRTCBase::IsSignalServerOK()
+{
+  return socket_->isConnected();
+}
 
 // void ShareRTCBase::ConnectToPeer(int peer_id) {
 //   RTC_DCHECK(peer_id_ == -1);

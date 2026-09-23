@@ -57,7 +57,11 @@ public:
    *  
    */
   int Connect( const char* url, const char* usertoken ) override;
-
+  
+  /** \brief 退出API服务器，关闭与信令服务器的连接 
+   * 
+   */
+  void Disconnect(); 
 
   /** \brief 创建Channel 返回ChannelID
    * 
@@ -149,6 +153,8 @@ protected:
     // virtual void ConnectToPeer(int peer_id)  {}
     // virtual void DisconnectPeer(int peer_id) override {}
     // virtual void Logout() override {}
+
+  bool inited_ = false;
 };
 
 #endif  // EXAMPLES_PEERCONNECTION_CLIENT_CONDUCTOR_H_

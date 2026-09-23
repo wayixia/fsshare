@@ -142,6 +142,12 @@ public:
    */
   virtual int Connect( const char* url, const char* usertoken ) = 0;
 
+
+  /** \brief 退出API服务器，关闭与信令服务器的连接 
+   * 
+   */
+  virtual void Disconnect() = 0;
+
   /** \brief 创建Channel 返回ChannelID
    * 
    */
