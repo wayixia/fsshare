@@ -52,6 +52,9 @@ public:
     // 检查当前线程是否是该 SimpleThread 实例
     bool IsCurrent() const;
 
+    // 线程是否正在运行（Start() 之后、Stop() 之前）
+    bool IsRunning() const { return running_.load(); }
+
     // 获取当前线程的 SimpleThread 实例（若无则返回 nullptr）
     static SimpleThread* Current();
 

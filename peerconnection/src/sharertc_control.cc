@@ -10,616 +10,250 @@
 
 #include "sharertc/peerconnection/src/sharertc_control.h"
 
-#include <cstddef>
 #include <memory>
-#include <optional>
-#include <string>
+#include <sstream>
 #include <utility>
-#include <vector>
-#include <iostream>
 
-#include "absl/base/nullability.h"
-#include "absl/memory/memory.h"
-#include "api/audio_codecs/builtin_audio_decoder_factory.h"
-#include "api/audio_codecs/builtin_audio_encoder_factory.h"
-#include "api/audio_options.h"
-#include "api/create_modular_peer_connection_factory.h"
-#include "api/enable_media.h"
-#include "api/environment/environment.h"
-#include "api/jsep.h"
-#include "api/make_ref_counted.h"
-#include "api/media_stream_interface.h"
-#include "api/peer_connection_interface.h"
-#include "api/rtc_error.h"
-#include "api/rtp_receiver_interface.h"
-#include "api/rtp_sender_interface.h"
-#include "api/scoped_refptr.h"
-#include "api/task_queue/task_queue_factory.h"
-#include "api/test/create_frame_generator.h"
-#include "api/video/video_frame.h"
-#include "api/video/video_source_interface.h"
-#include "api/video_codecs/video_decoder_factory_template.h"
-#include "api/video_codecs/video_decoder_factory_template_dav1d_adapter.h"
-#include "api/video_codecs/video_decoder_factory_template_libvpx_vp8_adapter.h"
-#include "api/video_codecs/video_decoder_factory_template_libvpx_vp9_adapter.h"
-#include "api/video_codecs/video_decoder_factory_template_open_h264_adapter.h"
-#include "api/video_codecs/video_encoder_factory_template.h"
-#include "api/video_codecs/video_encoder_factory_template_libaom_av1_adapter.h"
-#include "api/video_codecs/video_encoder_factory_template_libvpx_vp8_adapter.h"
-#include "api/video_codecs/video_encoder_factory_template_libvpx_vp9_adapter.h"
-#include "api/video_codecs/video_encoder_factory_template_open_h264_adapter.h"
-#include "sharertc/peerconnection/src/defaults.h"
-#include "sharertc/peerconnection/src/sharertc_connection.h"
-#include "sharertc/peerconnection/src/sharertc_url_parser.h"
-
-#include "json/reader.h"
-#include "json/value.h"
-#include "json/writer.h"
-#include "modules/video_capture/video_capture.h"
-#include "modules/video_capture/video_capture_factory.h"
-#include "pc/video_track_source.h"
-#include "rtc_base/checks.h"
 #include "rtc_base/logging.h"
-#include "rtc_base/strings/json.h"
-#include "rtc_base/thread.h"
-#include "system_wrappers/include/clock.h"
-
+#include "sharertc/peerconnection/src/sharertc_peer_connection.h"
+#include "sharertc/peerconnection/src/sharertc_url_parser.h"
 
 namespace {
 
-// // Names used for a IceCandidate JSON object.
-// const char kCandidateSdpMidName[] = "sdpMid";
-// const char kCandidateSdpMlineIndexName[] = "sdpMLineIndex";
-// const char kCandidateSdpName[] = "candidate";
+constexpr char kDefaultChannelLabel[] = "data";
 
-// // Names used for a SessionDescription JSON object.
-// const char kSessionDescriptionTypeName[] = "type";
-// const char kSessionDescriptionSdpName[] = "sdp";
+std::vector<std::string> SplitIceServers(const std::string& value) {
+  std::vector<std::string> urls;
+  size_t start = 0;
+  while (start <= value.size()) {
+    size_t end = value.find(',', start);
+    std::string url =
+        end == std::string::npos ? value.substr(start)
+                                 : value.substr(start, end - start);
+    const size_t first = url.find_first_not_of(" \t");
+    const size_t last = url.find_last_not_of(" \t");
+    if (first != std::string::npos) {
+      urls.push_back(url.substr(first, last - first + 1));
+    }
+    if (end == std::string::npos) {
+      break;
+    }
+    start = end + 1;
+  }
+  return urls;
+}
 
-class DummySetSessionDescriptionObserver
-    : public webrtc::SetSessionDescriptionObserver {
- public:
-  static webrtc::scoped_refptr<DummySetSessionDescriptionObserver> Create() {
-    return webrtc::make_ref_counted<DummySetSessionDescriptionObserver>();
-  }
-  void OnSuccess() override { RTC_LOG(LS_INFO) << __FUNCTION__; }
-  void OnFailure(webrtc::RTCError error) override {
-    RTC_LOG(LS_INFO) << __FUNCTION__ << " " << ToString(error.type()) << ": "
-                     << error.message();
-  }
-};
+std::string QueryValue(const std::map<std::string, std::string>& query,
+                       const char* key) {
+  auto it = query.find(key);
+  return it == query.end() ? std::string() : it->second;
+}
 
 }  // namespace
 
-ShareRTCControl::ShareRTCControl(const webrtc::Environment& env, ISignalSocket* signalsock)
-: ShareRTCBase(env, signalsock)
-  // : peer_id_(-1)
-  // , loopback_(false)
-  // , env_(env)
-  // , signal_connection_(std::bind( &ShareRTCControl::SendMessage, this, std::placeholders::_1) )
-  // , socket_(signalsock)
-{ 
-  //socket_->setObserver(this);
-  ///client_->RegisterObserver(this);
-  //main_wnd->RegisterObserver(this);
-}
+ShareRTCControl::ShareRTCControl(const webrtc::Environment& env,
+                                 std::unique_ptr<ISignalSocket> signalsocket)
+    : ShareRTCBase(env, std::move(signalsocket)) {}
 
-ShareRTCControl::~ShareRTCControl() {
-  //RTC_DCHECK(!peer_connection_);
-}
+ShareRTCControl::~ShareRTCControl() = default;
 
+void ShareRTCControl::SetObserver(IShareRTCChannelObserver* observer) {
+  channel_observer_.store(observer);
+}
 
 int ShareRTCControl::Connect(const char* peerurl, const char* token) {
-
-  if( inited_ )
-  {
-    // has inited
-    return -3;
-  }
-
-  if( !peerurl || !token )
-  {
+  if (!peerurl || !token) {
     return -1;
   }
 
-  auto r = ShareRTCUrl::parse(peerurl);
-  if( !r.ok ) {
+  const ShareRTCUrlParseResult parsed = ShareRTCUrl::parse(peerurl);
+  if (!parsed.ok) {
+    RTC_LOG(LS_ERROR) << "Invalid peer url '" << peerurl
+                      << "': " << parsed.error;
     return -2;
   }
-
-  // Save peer info
-  peer_id_ = r.value.peerid();
-  signal_server_addr_ = r.value.host();
-
-  if( !IsSignalServerOK() )
-  {
-    std::ostringstream signalserver_url;
-    signalserver_url << "ws://" << signal_server_addr_ << ":" << r.value.port() << "/signalingserver";
-    ShareRTCBase::Login(signalserver_url.str().c_str(), token);
+  if (inited_.exchange(true)) {
+    return -3;
   }
 
-  inited_ = true;
+  const ShareRTCUrl url = parsed.value;
+  const std::string usertoken = token;
+  RunOnSignalingThread([this, url, usertoken] {
+    peer_id_ = url.peerid();
+    signal_server_addr_ = url.host();
+
+    // ICE servers can be supplied by the API through the URL query, e.g.
+    //   ?ice_servers=stun:stun.example.com:3478,turn:turn.example.com:3478
+    //   &ice_username=user&ice_credential=pass
+    // Without them the default STUN server is used.
+    ConfigureIceServers(SplitIceServers(QueryValue(url.query(), "ice_servers")),
+                        QueryValue(url.query(), "ice_username"),
+                        QueryValue(url.query(), "ice_credential"));
+
+    if (!IsSignalServerOK()) {
+      std::ostringstream signalserver_url;
+      signalserver_url << "ws://" << url.host() << ":" << url.port()
+                       << "/signalingserver";
+      RTC_LOG(LS_INFO) << "Logging into signaling server "
+                       << signalserver_url.str() << " as peer " << peer_id_;
+      Login(signalserver_url.str().c_str(), usertoken.c_str());
+    }
+  });
 
   return 0;
 }
 
-
 void ShareRTCControl::Disconnect() {
-  Logout();
-  // clear peer connections
+  RunOnSignalingThread([this] {
+    if (!peer_id_.empty()) {
+      signal_connection_.SendDisconnect(peer_id_);
+    }
+    DestroyAllPeerConnections();
+    pending_channels_.clear();
+    offer_sent_ = false;
+    offer_in_flight_ = false;
+    renegotiate_pending_ = false;
+    Logout();
+    inited_.store(false);
+  });
 }
 
-bool ShareRTCControl::InitializePeerConnection() {
-  RTC_DCHECK(!peer_connection_factory_);
-
-  if (!signaling_thread_) {
-    signaling_thread_ = webrtc::Thread::CreateWithSocketServer();
-    signaling_thread_->Start();
+int ShareRTCControl::CreateChannel(const char* label,
+                                   IShareRTCChannelObserver* observer) {
+  if (!label || label[0] == '\0') {
+    return -1;
   }
+  const int channel_id = next_channel_id_.fetch_add(1);
+  std::string channel_label(label);
+  RunOnSignalingThread([this, channel_id, channel_label,
+                        observer]() mutable {
+    AddChannelOnSignalingThread(channel_id, std::move(channel_label),
+                                observer);
+  });
+  return channel_id;
+}
 
-  webrtc::PeerConnectionFactoryDependencies deps;
-  deps.signaling_thread = signaling_thread_.get();
-  deps.env = env_,
-  deps.audio_encoder_factory = webrtc::CreateBuiltinAudioEncoderFactory();
-  deps.audio_decoder_factory = webrtc::CreateBuiltinAudioDecoderFactory();
-  deps.video_encoder_factory =
-      std::make_unique<webrtc::VideoEncoderFactoryTemplate<
-          webrtc::LibvpxVp8EncoderTemplateAdapter,
-          webrtc::LibvpxVp9EncoderTemplateAdapter,
-          webrtc::OpenH264EncoderTemplateAdapter,
-          webrtc::LibaomAv1EncoderTemplateAdapter>>();
-  deps.video_decoder_factory =
-      std::make_unique<webrtc::VideoDecoderFactoryTemplate<
-          webrtc::LibvpxVp8DecoderTemplateAdapter,
-          webrtc::LibvpxVp9DecoderTemplateAdapter,
-          webrtc::OpenH264DecoderTemplateAdapter,
-          webrtc::Dav1dDecoderTemplateAdapter>>();
-  webrtc::EnableMedia(deps);
+void ShareRTCControl::AddChannelOnSignalingThread(
+    int channel_id,
+    std::string label,
+    IShareRTCChannelObserver* observer) {
+  ShareRTCPeerConnection* pc =
+      peer_id_.empty() ? nullptr : FindPeerConnection(peer_id_);
+  if (!pc) {
+    // The connection is created when the signaling server identifies us; all
+    // channels requested before that are created right before the offer.
+    pending_channels_.push_back({channel_id, std::move(label), observer});
+    return;
+  }
+  if (!pc->CreateDataChannel(channel_id, label, observer)) {
+    return;
+  }
+  if (!offer_in_flight_ &&
+      pc->signaling_state() == webrtc::PeerConnectionInterface::kStable) {
+    offer_sent_ = SendOfferOnSignalingThread();
+  } else {
+    renegotiate_pending_ = true;
+  }
+}
 
-  peer_connection_factory_ =
-      webrtc::CreateModularPeerConnectionFactory(std::move(deps));
-
-  if (!peer_connection_factory_) {
-    //main_wnd_->MessageBox("Error", "Failed to initialize PeerConnectionFactory",
-    //                      true);
-    //DeletePeerConnection();
+bool ShareRTCControl::SendOfferOnSignalingThread() {
+  ShareRTCPeerConnection* pc = FindPeerConnection(peer_id_);
+  if (!pc || !pc->CreateOffer()) {
     return false;
   }
-
-  return true;
-
-  // if (!CreatePeerConnection()) {
-  //   //main_wnd_->MessageBox("Error", "CreatePeerConnection failed", true);
-  //   DeletePeerConnection();
-  // }
-
-  // AddTracks();
-
-  // return peer_connection_ != nullptr;
-}
-
-bool ShareRTCControl::ReinitializePeerConnectionForLoopback() {
-  // loopback_ = true;
-  // std::vector<webrtc::scoped_refptr<webrtc::RtpSenderInterface>> senders =
-  //     peer_connection_->GetSenders();
-  // peer_connection_ = nullptr;
-  // // Loopback is only possible if encryption is disabled.
-  // webrtc::PeerConnectionFactoryInterface::Options options;
-  // options.disable_encryption = true;
-  // peer_connection_factory_->SetOptions(options);
-  // if (CreatePeerConnection()) {
-  //   for (const auto& sender : senders) {
-  //     peer_connection_->AddTrack(sender->track(), sender->stream_ids());
-  //   }
-  //   peer_connection_->CreateOffer(
-  //       this, webrtc::PeerConnectionInterface::RTCOfferAnswerOptions());
-  // }
-  // options.disable_encryption = false;
-  // peer_connection_factory_->SetOptions(options);
-  // return peer_connection_ != nullptr;
-
+  offer_in_flight_ = true;
   return true;
 }
 
-// bool ShareRTCControl::CreatePeerConnection() {
-//   RTC_DCHECK(peer_connection_factory_);
+int ShareRTCControl::Send(int channelid, const uint8_t* data, size_t len) {
+  if (!data || len == 0) {
+    return -1;
+  }
+  auto buffer = std::make_shared<std::vector<uint8_t>>(data, data + len);
+  RunOnSignalingThread([this, channelid, buffer] {
+    ShareRTCPeerConnection* pc =
+        peer_id_.empty() ? nullptr : FindPeerConnection(peer_id_);
+    if (pc) {
+      pc->Send(channelid, buffer->data(), buffer->size());
+    }
+  });
+  return 0;
+}
 
-//   webrtc::PeerConnectionInterface::RTCConfiguration config;
-//   config.sdp_semantics = webrtc::SdpSemantics::kUnifiedPlan;
-//   webrtc::PeerConnectionInterface::IceServer server;
-//   server.uri = GetPeerConnectionString();
-//   config.servers.push_back(server);
+// ---------------- Signaling / PeerConnection callbacks ----------------
 
-//   webrtc::PeerConnectionDependencies pc_dependencies(this);
-//   auto error_or_peer_connection =
-//       peer_connection_factory_->CreatePeerConnectionOrError(
-//           config, std::move(pc_dependencies));
-//   if (error_or_peer_connection.ok()) {
-//     peer_connection_ = std::move(error_or_peer_connection.value());
-//   }
-//   return peer_connection_ != nullptr;
-// }
+void ShareRTCControl::OnSignalIdentified(const std::string& id) {
+  RTC_LOG(LS_INFO) << "Identified as " << id << ", connecting to peer "
+                   << peer_id_;
+  if (peer_id_.empty() || offer_sent_) {
+    return;
+  }
+  if (!InitializePeerConnection()) {
+    return;
+  }
+  ShareRTCPeerConnection* pc = GetOrCreatePeerConnection(peer_id_);
+  if (!pc) {
+    RTC_LOG(LS_ERROR) << "Failed to create PeerConnection to " << peer_id_;
+    return;
+  }
 
-// void ShareRTCControl::DeletePeerConnection() {
-//   peer_connection_factory_ = nullptr;
-//   peer_id_ = -1;
-//   loopback_ = false;
-// }
+  for (const PendingChannel& channel : pending_channels_) {
+    pc->CreateDataChannel(channel.id, channel.label, channel.observer);
+  }
+  if (pending_channels_.empty()) {
+    // An offer without an m= section has nothing to negotiate, so make sure
+    // there is at least one data channel.
+    pc->CreateDataChannel(next_channel_id_.fetch_add(1), kDefaultChannelLabel,
+                          channel_observer_.load());
+  }
+  pending_channels_.clear();
 
-// void ShareRTCControl::EnsureStreamingUI() {
-//   RTC_DCHECK(peer_connection_);
-//   // if (main_wnd_->IsWindow()) {
-//   //   if (main_wnd_->current_ui() != MainWindow::STREAMING)
-//   //     main_wnd_->SwitchToStreamingUI();
-//   // }
-// }
+  offer_sent_ = SendOfferOnSignalingThread();
+}
 
-//
-// PeerConnectionObserver implementation.
-//
+void ShareRTCControl::OnPeerNegotiationNeeded(const std::string& peer_id) {
+  if (!offer_sent_ || offer_in_flight_ || peer_id != peer_id_) {
+    // The initial offer is created explicitly in OnSignalIdentified(); while
+    // an offer is in flight WebRTC always reports negotiation-needed.
+    return;
+  }
+  ShareRTCPeerConnection* pc = FindPeerConnection(peer_id);
+  if (!pc) {
+    return;
+  }
+  if (pc->signaling_state() == webrtc::PeerConnectionInterface::kStable) {
+    offer_sent_ = SendOfferOnSignalingThread();
+  } else {
+    renegotiate_pending_ = true;
+  }
+}
 
-// void ShareRTCControl::OnAddTrack(
-//     webrtc::scoped_refptr<webrtc::RtpReceiverInterface> receiver,
-//     const std::vector<webrtc::scoped_refptr<webrtc::MediaStreamInterface>>&
-//         streams) {
-//   RTC_LOG(LS_INFO) << __FUNCTION__ << " " << receiver->id();
-//   // main_wnd_->QueueUIThreadCallback(NEW_TRACK_ADDED,
-//   //                                  receiver->track().release());
-// }
+void ShareRTCControl::OnPeerSignalingStateChange(
+    const std::string& peer_id,
+    webrtc::PeerConnectionInterface::SignalingState state) {
+  if (peer_id != peer_id_) {
+    return;
+  }
+  if (state != webrtc::PeerConnectionInterface::kStable) {
+    return;
+  }
+  offer_in_flight_ = false;
+  if (renegotiate_pending_) {
+    renegotiate_pending_ = false;
+    offer_sent_ = SendOfferOnSignalingThread();
+  }
+}
 
-// void ShareRTCControl::OnRemoveTrack(
-//     webrtc::scoped_refptr<webrtc::RtpReceiverInterface> receiver) {
-//   RTC_LOG(LS_INFO) << __FUNCTION__ << " " << receiver->id();
-//   //main_wnd_->QueueUIThreadCallback(TRACK_REMOVED, receiver->track().release());
-// }
+void ShareRTCControl::OnPeerConnectionStateChange(
+    const std::string& peer_id,
+    webrtc::PeerConnectionInterface::PeerConnectionState state) {
+  RTC_LOG(LS_INFO) << "Peer " << peer_id << " connection state "
+                   << static_cast<int>(state);
+}
 
-// void ShareRTCControl::OnIceCandidate(const webrtc::IceCandidate* candidate) {
-//   RTC_LOG(LS_INFO) << __FUNCTION__ << " " << candidate->sdp_mline_index();
-//   // For loopback test. To save some connecting delay.
-//   if (loopback_) {
-//     if (!peer_connection_->AddIceCandidate(candidate)) {
-//       RTC_LOG(LS_WARNING) << "Failed to apply the received candidate";
-//     }
-//     return;
-//   }
-
-//   Json::Value jmessage;
-//   jmessage[kCandidateSdpMidName] = candidate->sdp_mid();
-//   jmessage[kCandidateSdpMlineIndexName] = candidate->sdp_mline_index();
-//   jmessage[kCandidateSdpName] = candidate->ToString();
-
-//   Json::StreamWriterBuilder factory;
-//   SendMessage(Json::writeString(factory, jmessage));
-// }
-
-// //
-// // PeerConnectionClientObserver implementation.
-// //
-
-// void ShareRTCControl::OnSignedIn() {
-//   RTC_LOG(LS_INFO) << __FUNCTION__;
-//   // main_wnd_->SwitchToPeerList(client_->peers());
-// }
-
-// void ShareRTCControl::OnDisconnected() {
-//   RTC_LOG(LS_INFO) << __FUNCTION__;
-
-//   DeletePeerConnection();
-
-//   // if (main_wnd_->IsWindow())
-//   //   main_wnd_->SwitchToConnectUI();
-// }
-
-// void ShareRTCControl::OnPeerConnected(int id, const std::string& name) {
-//   RTC_LOG(LS_INFO) << __FUNCTION__;
-//   // Refresh the list if we're showing it.
-//   // if (main_wnd_->current_ui() == MainWindow::LIST_PEERS)
-//   //   main_wnd_->SwitchToPeerList(client_->peers());
-// }
-
-// void ShareRTCControl::OnPeerDisconnected(int id) {
-//   RTC_LOG(LS_INFO) << __FUNCTION__;
-//   // if (id == peer_id_) {
-//   //   RTC_LOG(LS_INFO) << "Our peer disconnected";
-//   //   main_wnd_->QueueUIThreadCallback(PEER_CONNECTION_CLOSED, nullptr);
-//   // } else {
-//   //   // Refresh the list if we're showing it.
-//   //   if (main_wnd_->current_ui() == MainWindow::LIST_PEERS)
-//   //     main_wnd_->SwitchToPeerList(client_->peers());
-//   // }
-// }
-
-// void ShareRTCControl::OnMessageFromPeer(int peer_id, const std::string& message) {
-//   RTC_DCHECK(peer_id_ == peer_id || peer_id_ == -1);
-//   RTC_DCHECK(!message.empty());
-
-//   if (!peer_connection_) {
-//     RTC_DCHECK(peer_id_ == -1);
-//     peer_id_ = peer_id;
-
-//     if (!InitializePeerConnection()) {
-//       RTC_LOG(LS_ERROR) << "Failed to initialize our PeerConnection instance";
-//       client_->SignOut();
-//       return;
-//     }
-//   } else if (peer_id != peer_id_) {
-//     RTC_DCHECK(peer_id_ != -1);
-//     RTC_LOG(LS_WARNING)
-//         << "Received a message from unknown peer while already in a "
-//            "conversation with a different peer.";
-//     return;
-//   }
-
-//   Json::CharReaderBuilder factory;
-//   std::unique_ptr<Json::CharReader> reader =
-//       absl::WrapUnique(factory.newCharReader());
-//   Json::Value jmessage;
-//   if (!reader->parse(message.data(), message.data() + message.length(),
-//                      &jmessage, nullptr)) {
-//     RTC_LOG(LS_WARNING) << "Received unknown message. " << message;
-//     return;
-//   }
-//   std::string type_str;
-//   std::string json_object;
-
-//   webrtc::GetStringFromJsonObject(jmessage, kSessionDescriptionTypeName,
-//                                   &type_str);
-//   if (!type_str.empty()) {
-//     if (type_str == "offer-loopback") {
-//       // This is a loopback call.
-//       // Recreate the peerconnection with DTLS disabled.
-//       if (!ReinitializePeerConnectionForLoopback()) {
-//         RTC_LOG(LS_ERROR) << "Failed to initialize our PeerConnection instance";
-//         DeletePeerConnection();
-//         client_->SignOut();
-//       }
-//       return;
-//     }
-//     std::optional<webrtc::SdpType> type_maybe =
-//         webrtc::SdpTypeFromString(type_str);
-//     if (!type_maybe) {
-//       RTC_LOG(LS_ERROR) << "Unknown SDP type: " << type_str;
-//       return;
-//     }
-//     webrtc::SdpType type = *type_maybe;
-//     std::string sdp;
-//     if (!webrtc::GetStringFromJsonObject(jmessage, kSessionDescriptionSdpName,
-//                                          &sdp)) {
-//       RTC_LOG(LS_WARNING)
-//           << "Can't parse received session description message.";
-//       return;
-//     }
-//     webrtc::SdpParseError error;
-//     std::unique_ptr<webrtc::SessionDescriptionInterface> session_description =
-//         webrtc::CreateSessionDescription(type, sdp, &error);
-//     if (!session_description) {
-//       RTC_LOG(LS_WARNING)
-//           << "Can't parse received session description message. "
-//              "SdpParseError was: "
-//           << error.description;
-//       return;
-//     }
-//     RTC_LOG(LS_INFO) << " Received session description :" << message;
-//     peer_connection_->SetRemoteDescription(
-//         DummySetSessionDescriptionObserver::Create().get(),
-//         session_description.release());
-//     if (type == webrtc::SdpType::kOffer) {
-//       peer_connection_->CreateAnswer(
-//           this, webrtc::PeerConnectionInterface::RTCOfferAnswerOptions());
-//     }
-//   } else {
-//     std::string sdp_mid;
-//     int sdp_mlineindex = 0;
-//     std::string sdp;
-//     if (!webrtc::GetStringFromJsonObject(jmessage, kCandidateSdpMidName,
-//                                          &sdp_mid) ||
-//         !webrtc::GetIntFromJsonObject(jmessage, kCandidateSdpMlineIndexName,
-//                                       &sdp_mlineindex) ||
-//         !webrtc::GetStringFromJsonObject(jmessage, kCandidateSdpName, &sdp)) {
-//       RTC_LOG(LS_WARNING) << "Can't parse received message.";
-//       return;
-//     }
-//     webrtc::SdpParseError error;
-//     std::unique_ptr<webrtc::IceCandidate> candidate(
-//         webrtc::CreateIceCandidate(sdp_mid, sdp_mlineindex, sdp, &error));
-//     if (!candidate) {
-//       RTC_LOG(LS_WARNING) << "Can't parse received candidate message. "
-//                              "SdpParseError was: "
-//                           << error.description;
-//       return;
-//     }
-//     if (!peer_connection_->AddIceCandidate(candidate.get())) {
-//       RTC_LOG(LS_WARNING) << "Failed to apply the received candidate";
-//       return;
-//     }
-//     RTC_LOG(LS_INFO) << " Received candidate :" << message;
-//   }
-// }
-
-// void ShareRTCControl::OnMessageSent(int err) {
-//   // Process the next pending message if any.
-//   // main_wnd_->QueueUIThreadCallback(SEND_MESSAGE_TO_PEER, nullptr);
-// }
-
-// void ShareRTCControl::OnServerConnectionFailure() {
-//   // main_wnd_->MessageBox("Error", ("Failed to connect to " + server_).c_str(),
-//   //                       true);
-// }
-
-//
-// MainWndCallback implementation.
-//
-
-// void ShareRTCControl::Login(const char* signalserver, const char* token ) {
-//   // 目前简单处理， 直接链接信令服务器
-//   socket_->connect(signalserver, token);
-// }
-
-// void ShareRTCControl::DisconnectFromServer() {
-//   if (client_->is_connected())
-//     client_->SignOut();
-// }
-
-// void ShareRTCControl::ConnectToPeer(int peer_id) {
-//   RTC_DCHECK(peer_id_ == -1);
-//   RTC_DCHECK(peer_id != -1);
-
-//   if (peer_connection_) {
-//     main_wnd_->MessageBox(
-//         "Error", "We only support connecting to one peer at a time", true);
-//     return;
-//   }
-
-//   if (InitializePeerConnection()) {
-//     peer_id_ = peer_id;
-//     peer_connection_->CreateOffer(
-//         this, webrtc::PeerConnectionInterface::RTCOfferAnswerOptions());
-//   } else {
-//     main_wnd_->MessageBox("Error", "Failed to initialize PeerConnection", true);
-//   }
-// }
-
-//void ShareRTCControl::AddTracks() {
-  // if (!peer_connection_->GetSenders().empty()) {
-  //   return;  // Already added tracks.
-  // }
-
-  // webrtc::scoped_refptr<webrtc::AudioTrackInterface> audio_track(
-  //     peer_connection_factory_->CreateAudioTrack(
-  //         kAudioLabel,
-  //         peer_connection_factory_->CreateAudioSource(webrtc::AudioOptions())
-  //             .get()));
-  // auto result_or_error = peer_connection_->AddTrack(audio_track, {kStreamId});
-  // if (!result_or_error.ok()) {
-  //   RTC_LOG(LS_ERROR) << "Failed to add audio track to PeerConnection: "
-  //                     << result_or_error.error().message();
-  // }
-
-  // webrtc::scoped_refptr<CapturerTrackSource> video_device =
-  //     CapturerTrackSource::Create(env_.task_queue_factory());
-  // if (video_device) {
-  //   webrtc::scoped_refptr<webrtc::VideoTrackInterface> video_track_(
-  //       peer_connection_factory_->CreateVideoTrack(video_device, kVideoLabel));
-  //   main_wnd_->StartLocalRenderer(video_track_.get());
-
-  //   result_or_error = peer_connection_->AddTrack(video_track_, {kStreamId});
-  //   if (!result_or_error.ok()) {
-  //     RTC_LOG(LS_ERROR) << "Failed to add video track to PeerConnection: "
-  //                       << result_or_error.error().message();
-  //   }
-  // } else {
-  //   RTC_LOG(LS_ERROR) << "OpenVideoCaptureDevice failed";
-  // }
-
-  // main_wnd_->SwitchToStreamingUI();
-//}
-
-// void ShareRTCControl::DisconnectFromCurrentPeer() {
-//   RTC_LOG(LS_INFO) << __FUNCTION__;
-//   if (peer_connection_) {
-//     client_->SendHangUp(peer_id_);
-//     DeletePeerConnection();
-//   }
-
-//   if (main_wnd_->IsWindow())
-//     main_wnd_->SwitchToPeerList(client_->peers());
-// }
-
-// void ShareRTCControl::UIThreadCallback(int msg_id, void* data) {
-//   switch (msg_id) {
-//     case PEER_CONNECTION_CLOSED:
-//       RTC_LOG(LS_INFO) << "PEER_CONNECTION_CLOSED";
-//       DeletePeerConnection();
-
-//       if (main_wnd_->IsWindow()) {
-//         if (client_->is_connected()) {
-//           main_wnd_->SwitchToPeerList(client_->peers());
-//         } else {
-//           main_wnd_->SwitchToConnectUI();
-//         }
-//       } else {
-//         DisconnectFromServer();
-//       }
-//       break;
-
-//     case SEND_MESSAGE_TO_PEER: {
-//       RTC_LOG(LS_INFO) << "SEND_MESSAGE_TO_PEER";
-//       std::string* msg = reinterpret_cast<std::string*>(data);
-//       if (msg) {
-//         // For convenience, we always run the message through the queue.
-//         // This way we can be sure that messages are sent to the server
-//         // in the same order they were signaled without much hassle.
-//         pending_messages_.push_back(msg);
-//       }
-
-//       if (!pending_messages_.empty() && !client_->IsSendingMessage()) {
-//         msg = pending_messages_.front();
-//         pending_messages_.pop_front();
-
-//         if (!client_->SendToPeer(peer_id_, *msg) && peer_id_ != -1) {
-//           RTC_LOG(LS_ERROR) << "SendToPeer failed";
-//           DisconnectFromServer();
-//         }
-//         delete msg;
-//       }
-
-//       if (!peer_connection_)
-//         peer_id_ = -1;
-
-//       break;
-//     }
-
-//     case NEW_TRACK_ADDED: {
-//       auto* track = reinterpret_cast<webrtc::MediaStreamTrackInterface*>(data);
-//       if (track->kind() == webrtc::MediaStreamTrackInterface::kVideoKind) {
-//         auto* video_track = static_cast<webrtc::VideoTrackInterface*>(track);
-//         main_wnd_->StartRemoteRenderer(video_track);
-//       }
-//       track->Release();
-//       break;
-//     }
-
-//     case TRACK_REMOVED: {
-//       // Remote peer stopped sending a track.
-//       auto* track = reinterpret_cast<webrtc::MediaStreamTrackInterface*>(data);
-//       track->Release();
-//       break;
-//     }
-
-//     default:
-//       RTC_DCHECK_NOTREACHED();
-//       break;
-//   }
-// }
-
-// void ShareRTCControl::OnSuccess(webrtc::SessionDescriptionInterface* desc) {
-//   peer_connection_->SetLocalDescription(
-//       DummySetSessionDescriptionObserver::Create().get(), desc);
-
-//   std::string sdp;
-//   desc->ToString(&sdp);
-
-//   // For loopback test. To save some connecting delay.
-//   if (loopback_) {
-//     // Replace message type from "offer" to "answer"
-//     std::unique_ptr<webrtc::SessionDescriptionInterface> session_description =
-//         webrtc::CreateSessionDescription(webrtc::SdpType::kAnswer, sdp);
-//     peer_connection_->SetRemoteDescription(
-//         DummySetSessionDescriptionObserver::Create().get(),
-//         session_description.release());
-//     return;
-//   }
-
-//   Json::Value jmessage;
-//   jmessage[kSessionDescriptionTypeName] =
-//       webrtc::SdpTypeToString(desc->GetType());
-//   jmessage[kSessionDescriptionSdpName] = sdp;
-
-//   Json::StreamWriterBuilder factory;
-//   SendMessage(Json::writeString(factory, jmessage));
-// }
-
-// void ShareRTCControl::OnFailure(webrtc::RTCError error) {
-//   RTC_LOG(LS_ERROR) << ToString(error.type()) << ": " << error.message();
-// }
-
+void ShareRTCControl::OnSignalConnectionClosed() {
+  offer_sent_ = false;
+  offer_in_flight_ = false;
+  renegotiate_pending_ = false;
+  pending_channels_.clear();
+}

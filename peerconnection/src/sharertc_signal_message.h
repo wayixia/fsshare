@@ -77,7 +77,13 @@ struct AnswerContent : public BaseContent {
 
 struct ICECandidateContent : public BaseContent {
     std::string candidate;
+    // The media section this candidate belongs to. Kept as a string because
+    // SDP m-line mids are not necessarily numeric.
+    std::string sdpMid;
     int sdpMLineIndex{0};
+    // ICE ufrag of the candidate. Optional; helps the remote side demultiplex
+    // candidates across ICE restarts.
+    std::string usernameFragment;
     Json::Value toJson() const override;
     bool fromJson(const Json::Value& jv, std::string& err) override;
 };

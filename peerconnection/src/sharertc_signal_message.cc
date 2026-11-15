@@ -204,7 +204,9 @@ bool AnswerContent::fromJson(const Json::Value& jv, std::string& err) {
 Json::Value ICECandidateContent::toJson() const {
     Json::Value jv;
     jv["candidate"] = candidate;
+    jv["sdpMid"] = sdpMid;
     jv["sdpMLineIndex"] = sdpMLineIndex;
+    jv["usernameFragment"] = usernameFragment;
     return jv;
 }
 bool ICECandidateContent::fromJson(const Json::Value& jv, std::string& err) {
@@ -214,6 +216,13 @@ bool ICECandidateContent::fromJson(const Json::Value& jv, std::string& err) {
     }
     candidate = jv["candidate"].asString();
     sdpMLineIndex = jv["sdpMLineIndex"].asInt();
+    // sdpMid / usernameFragment are optional for backwards compatibility.
+    if (jv.isMember("sdpMid")) {
+        sdpMid = jv["sdpMid"].asString();
+    }
+    if (jv.isMember("usernameFragment")) {
+        usernameFragment = jv["usernameFragment"].asString();
+    }
     return true;
 }
 
@@ -263,7 +272,25 @@ std::unique_ptr<BaseContent> Message::unmarshalContent(std::string& outErr) {
         outErr = "invalid message kind: " + messageTypeToString(kind);
         return nullptr;
     }
-    if (!payload->fromJson(content, outErr)) {
+
+    // Some peers serialize the inner content as a JSON string instead of a
+    // nested object. Accept both encodings.
+    Json::Value content_json = content;
+    if (content.isString()) {
+        Json::Value parsed;
+        Json::CharReaderBuilder builder;
+        std::unique_ptr<Json::CharReader> reader(builder.newCharReader());
+        std::string errors;
+        const std::string encoded = content.asString();
+        if (!reader->parse(encoded.data(), encoded.data() + encoded.size(),
+                           &parsed, &errors)) {
+            outErr = "failed to parse string encoded content: " + errors;
+            return nullptr;
+        }
+        content_json = parsed;
+    }
+
+    if (!payload->fromJson(content_json, outErr)) {
         return nullptr;
     }
     return payload;
@@ -290,6 +317,10 @@ Json::Value messageToJson(const Message& msg)
 bool jsonToMessage(const Json::Value& root, Message& outMsg, std::string& outErr)
 {
   outErr.clear();
+    if (!root.isObject()) {
+      outErr = "message must be a JSON object";
+      return false;
+    }
     if( !messageTypeFromString(root["kind"].asString(), outMsg.kind, outErr ) )
       return false;
   

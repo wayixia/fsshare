@@ -11,113 +11,33 @@
 #ifndef SHARERTC_CLIENT_H_
 #define SHARERTC_CLIENT_H_
 
-#include <deque>
-#include <memory>
 #include <string>
-#include <vector>
 
-#include "absl/base/nullability.h"
-#include "api/data_channel_interface.h"
 #include "api/environment/environment.h"
-#include "api/jsep.h"
-#include "api/media_stream_interface.h"
 #include "api/peer_connection_interface.h"
-#include "api/rtc_error.h"
-#include "api/rtp_receiver_interface.h"
-#include "api/scoped_refptr.h"
-#include "rtc_base/thread.h"
-
-#include "sharertc/peerconnection/src/sharertc_connection.h"
-#include "sharertc/peerconnection/src/sharertc_signal_connection.h"
 #include "sharertc/peerconnection/include/sharertc/sharertc.h"
 #include "sharertc/peerconnection/src/sharertc_base.h"
 
+// Connection receiver. After Login() the ShareRTCBase implementation answers
+// incoming offers and completes the ICE exchange; no offer is initiated here.
+class ShareRTCClient : public ShareRTCBase, public IShareRTCClient {
+ public:
+  ShareRTCClient(const webrtc::Environment& env,
+                 std::unique_ptr<ISignalSocket> signalsocket);
+  ~ShareRTCClient() override;
 
+  // IShareRTCClient implementation.
+  void Login(const char* signalserver, const char* token) override;
+  void DisconnectFromServer() override;
+  void DisconnectPeer(int peer_id) override;
+  void Logout() override;
 
-class ShareRTCClient 
-: public ShareRTCBase
-, public IShareRTCClient
-//: public webrtc::PeerConnectionObserver
-//, public webrtc::CreateSessionDescriptionObserver
-{
-public:
-  ShareRTCClient(const webrtc::Environment& env, ISignalSocket* signalsocket );
-  ~ShareRTCClient();
-
-protected:
-  // bool InitializePeerConnection();
-  // bool ReinitializePeerConnectionForLoopback();
-  ShareRTCConnection* OnAccept( const char* ice_servers, const char* username, const char* secpass );
-  //void DeletePeerConnection();
-  //void AddTracks();
-
-  //
-  // PeerConnectionObserver implementation.
-  //
-
-//   void OnSignalingChange(
-//       webrtc::PeerConnectionInterface::SignalingState new_state) override {}
-//   void OnAddTrack(
-//       webrtc::scoped_refptr<webrtc::RtpReceiverInterface> receiver,
-//       const std::vector<webrtc::scoped_refptr<webrtc::MediaStreamInterface>>&
-//           streams) override;
-//   void OnRemoveTrack(
-//       webrtc::scoped_refptr<webrtc::RtpReceiverInterface> receiver) override;
-//   void OnDataChannel(
-//       webrtc::scoped_refptr<webrtc::DataChannelInterface> channel) override {}
-//   void OnRenegotiationNeeded() override {}
-//   void OnIceConnectionChange(
-//       webrtc::PeerConnectionInterface::IceConnectionState new_state) override {}
-//   void OnIceGatheringChange(
-//       webrtc::PeerConnectionInterface::IceGatheringState new_state) override {}
-//   void OnIceCandidate(const webrtc::IceCandidate* candidate) override;
-//   void OnIceConnectionReceivingChange(bool receiving) override {}
-//   void OnIceCandidateRemoved(const webrtc::IceCandidate* candidate) override {}
-
-//   //
-//   // PeerConnectionClientObserver implementation.
-//   //
-
-//   void OnSignedIn() override;
-
-//   void OnDisconnected() override;
-
-//   void OnPeerConnected(int id, const std::string& name) override;
-
-//   void OnPeerDisconnected(int id) override;
-
-//   void OnMessageFromPeer(int peer_id, const std::string& message) override;
-
-//   void OnMessageSent(int err) override;
-
-//   void OnServerConnectionFailure() override;
-
-  //
-  // MainWndCallback implementation.
-  //
-
-//   void StartLogin(const std::string& server, int port) override;
-
-//   void DisconnectFromServer() override;
-
-//   void ConnectToPeer(int peer_id) override;
-
-//   void DisconnectFromCurrentPeer() override;
-
-//   void UIThreadCallback(int msg_id, void* data) override;
-
-  // CreateSessionDescriptionObserver implementation.
-//   void OnSuccess(webrtc::SessionDescriptionInterface* desc) override;
-//   void OnFailure(webrtc::RTCError error) override;
-
-
-  virtual void Login(const char* signalserver, const char* token ) override;
-  virtual void DisconnectFromServer() override {}
-  virtual void DisconnectPeer(int peer_id) override {}
-  virtual void Logout() override {}
-
-protected:
-  //webrtc::scoped_refptr<webrtc::PeerConnectionInterface> peer_connection_;
+ protected:
+  void OnRemoteDataChannel(const std::string& peer_id,
+                           const std::string& label) override;
+  void OnPeerConnectionStateChange(
+      const std::string& peer_id,
+      webrtc::PeerConnectionInterface::PeerConnectionState state) override;
 };
 
-#endif  // EXAMPLES_PEERCONNECTION_CLIENT_CONDUCTOR_H_
+#endif  // SHARERTC_CLIENT_H_

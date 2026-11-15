@@ -11,150 +11,73 @@
 #ifndef SHARERTC_CONTROL_H_
 #define SHARERTC_CONTROL_H_
 
-#include <deque>
-#include <memory>
+#include <atomic>
+#include <cstddef>
+#include <cstdint>
 #include <string>
 #include <vector>
 
-#include "absl/base/nullability.h"
-#include "api/data_channel_interface.h"
 #include "api/environment/environment.h"
-#include "api/jsep.h"
-#include "api/media_stream_interface.h"
 #include "api/peer_connection_interface.h"
-#include "api/rtc_error.h"
-#include "api/rtp_receiver_interface.h"
-#include "api/scoped_refptr.h"
-#include "rtc_base/thread.h"
 #include "sharertc/peerconnection/include/sharertc/sharertc.h"
-#include "sharertc/peerconnection/src/sharertc_connection.h"
-#include "sharertc/peerconnection/src/sharertc_signal_connection.h"
 #include "sharertc/peerconnection/src/sharertc_base.h"
 
+// Connection initiator: logs into the signaling server, creates the offer and
+// drives the ICE exchange with the peer named in the Connect() URL.
+class ShareRTCControl : public ShareRTCBase, public IShareRTCControl {
+ public:
+  ShareRTCControl(const webrtc::Environment& env,
+                  std::unique_ptr<ISignalSocket> signalsocket);
+  ~ShareRTCControl() override;
 
+  // IShareRTCControl implementation.
+  void SetObserver(IShareRTCChannelObserver* observer) override;
 
+  // Parses `url` (https://signalserver:port/peerid[?ice_servers=...]) and
+  // logs into the signaling server. The offer is sent once the server has
+  // identified us. Returns 0 on success, negative on invalid arguments.
+  int Connect(const char* url, const char* usertoken) override;
+  void Disconnect() override;
 
-class ShareRTCControl
-: public ShareRTCBase
-, public IShareRTCControl
-//: public webrtc::PeerConnectionObserver
-//, public webrtc::CreateSessionDescriptionObserver
-{
-public:
-  ShareRTCControl(const webrtc::Environment& env, ISignalSocket* signalsocket );
-  ~ShareRTCControl();
+  // Returns a positive channel id, or -1 on invalid arguments.
+  int CreateChannel(const char* label,
+                    IShareRTCChannelObserver* observer) override;
+  int Send(int channelid, const uint8_t* data, size_t len) override;
 
-public:
-  /** \brief 设置外部状态监听 
-   * 
-   */
-  void SetObserver( IShareRTCChannelObserver* ) override
-  {
+ protected:
+  void OnSignalIdentified(const std::string& id) override;
+  void OnPeerNegotiationNeeded(const std::string& peer_id) override;
+  void OnPeerSignalingStateChange(
+      const std::string& peer_id,
+      webrtc::PeerConnectionInterface::SignalingState state) override;
+  void OnPeerConnectionStateChange(
+      const std::string& peer_id,
+      webrtc::PeerConnectionInterface::PeerConnectionState state) override;
+  void OnSignalConnectionClosed() override;
 
-  }
+ private:
+  struct PendingChannel {
+    int id;
+    std::string label;
+    IShareRTCChannelObserver* observer;
+  };
 
-  /** \brief 登录API服务器，获取登录信令服务器token，用于链接客户端 
-   *  
-   */
-  int Connect( const char* url, const char* usertoken ) override;
-  
-  /** \brief 退出API服务器，关闭与信令服务器的连接 
-   * 
-   */
-  void Disconnect(); 
+  // Signaling thread only.
+  void AddChannelOnSignalingThread(int channel_id,
+                                   std::string label,
+                                   IShareRTCChannelObserver* observer);
+  bool SendOfferOnSignalingThread();
 
-  /** \brief 创建Channel 返回ChannelID
-   * 
-   */
-  int CreateChannel( const char* label, IShareRTCChannelObserver* ) override
-  {
-    return 0;
-  }
+  std::atomic<bool> inited_{false};
+  std::atomic<IShareRTCChannelObserver*> channel_observer_{nullptr};
+  std::atomic<int> next_channel_id_{1};
 
-  /** \brief 发送channel数据
-   * 
-   */
-  int Send( int channelid, const uint8_t* data, size_t len) override
-  {
-    return 0;
-  }
-
-public:
-  ShareRTCConnection* CreateConnection(const char* iceservers );
-  
-
-protected:
-  bool InitializePeerConnection();
-  bool ReinitializePeerConnectionForLoopback();
-  //void DeletePeerConnection();
-
-  //
-  // PeerConnectionObserver implementation.
-  //
-
-//   void OnSignalingChange(
-//       webrtc::PeerConnectionInterface::SignalingState new_state) override {}
-//   void OnAddTrack(
-//       webrtc::scoped_refptr<webrtc::RtpReceiverInterface> receiver,
-//       const std::vector<webrtc::scoped_refptr<webrtc::MediaStreamInterface>>&
-//           streams) override;
-//   void OnRemoveTrack(
-//       webrtc::scoped_refptr<webrtc::RtpReceiverInterface> receiver) override;
-//   void OnDataChannel(
-//       webrtc::scoped_refptr<webrtc::DataChannelInterface> channel) override {}
-//   void OnRenegotiationNeeded() override {}
-//   void OnIceConnectionChange(
-//       webrtc::PeerConnectionInterface::IceConnectionState new_state) override {}
-//   void OnIceGatheringChange(
-//       webrtc::PeerConnectionInterface::IceGatheringState new_state) override {}
-//   void OnIceCandidate(const webrtc::IceCandidate* candidate) override;
-//   void OnIceConnectionReceivingChange(bool receiving) override {}
-//   void OnIceCandidateRemoved(const webrtc::IceCandidate* candidate) override {}
-
-//   //
-//   // PeerConnectionClientObserver implementation.
-//   //
-
-//   void OnSignedIn() override;
-
-//   void OnDisconnected() override;
-
-//   void OnPeerConnected(int id, const std::string& name) override;
-
-//   void OnPeerDisconnected(int id) override;
-
-//   void OnMessageFromPeer(int peer_id, const std::string& message) override;
-
-//   void OnMessageSent(int err) override;
-
-//   void OnServerConnectionFailure() override;
-
-  //
-  // MainWndCallback implementation.
-  //
-
-//   void StartLogin(const std::string& server, int port) override;
-
-//   void DisconnectFromServer() override;
-
-//   void ConnectToPeer(int peer_id) override;
-
-//   void DisconnectFromCurrentPeer() override;
-
-//   void UIThreadCallback(int msg_id, void* data) override;
-
-  // CreateSessionDescriptionObserver implementation.
-//   void OnSuccess(webrtc::SessionDescriptionInterface* desc) override;
-//   void OnFailure(webrtc::RTCError error) override;
-
-
-    // virtual void Login(const char* signalserver, const char* token ) override;
-    // virtual void DisconnectFromServer() override {}
-    // virtual void ConnectToPeer(int peer_id)  {}
-    // virtual void DisconnectPeer(int peer_id) override {}
-    // virtual void Logout() override {}
-
-  bool inited_ = false;
+  // Signaling thread only.
+  std::vector<PendingChannel> pending_channels_;
+  bool offer_sent_ = false;
+  // True between CreateOffer() and the signaling state returning to stable.
+  bool offer_in_flight_ = false;
+  bool renegotiate_pending_ = false;
 };
 
-#endif  // EXAMPLES_PEERCONNECTION_CLIENT_CONDUCTOR_H_
+#endif  // SHARERTC_CONTROL_H_

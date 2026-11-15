@@ -74,10 +74,16 @@ public:
 
 private:
   bool DoConnectUrl(const std::string& url, const std::string& token);
+  bool DoSendText(const std::string& text);
+  bool DoSendBinary(const uint8_t* data, size_t len);
+  // Destroys the libwebsockets context without asserting the caller is on the
+  // network thread. Only safe when no other thread is servicing the context.
+  void DoClose();
   
 private:
   struct Impl;
-  std::unique_ptr<Impl> impl_;
+  std::shared_ptr<Impl> impl_;
   SimpleThread* net_thread_;
   ISignalSocketObserver* observer_ = nullptr;
+  std::atomic<bool> shutting_down_{false};
 };

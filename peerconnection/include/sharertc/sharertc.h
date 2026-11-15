@@ -24,6 +24,8 @@
 
 
 // 网络事件回调
+//
+// 注意：回调可能在该 socket 自己的网络线程上触发，回调实现不能阻塞该线程。
 class ISignalSocketObserver {
 public:
     virtual ~ISignalSocketObserver() = default;
@@ -34,6 +36,10 @@ public:
 };
 
 // 底层网络抽象
+//
+// 注意：IShareRTC* 内部有一个 WebRTC signaling 线程，SDP/ICE 消息会在该
+// 线程上调用 send()，所以本接口的所有方法都必须线程安全。
+// 回调同样可能在任意线程触发。
 class ISignalSocket {
 public:
     virtual ~ISignalSocket() = default;
@@ -42,6 +48,17 @@ public:
     virtual void disconnect() = 0;
     virtual bool send(const uint8_t* data, size_t len) = 0;
     virtual bool isConnected() const = 0;
+};
+
+// 信令 socket 工厂
+//
+// ShareRTCClient/ShareRTCControl 创建时会调用 CreateWebSocket() 取得一个
+// 尚未连接的信令 socket。socket 的所有权转移给 SDK，会随 ShareRTC 对象
+// 一起 delete。工厂对象本身由调用者管理，必须比创建出的 ShareRTC 对象活得久。
+class IWebSocketFactory {
+public:
+    virtual ~IWebSocketFactory() = default;
+    virtual ISignalSocket* CreateWebSocket() = 0;
 };
 
 // // ==================== 信令连接接口 ====================
@@ -137,8 +154,12 @@ public:
    */
   virtual void SetObserver( IShareRTCChannelObserver* ) = 0;
 
-  /** \brief 登录API服务器，获取登录信令服务器token，用于链接客户端 
-   *  
+  /** \brief 登录API服务器，获取登录信令服务器token，用于链接客户端
+   *
+   * url 格式: https://signalserver:port/peerid
+   * 可通过 query 指定 ICE 服务器:
+   *   ?ice_servers=stun:stun.example.com:3478,turn:turn.example.com:3478
+   *   &ice_username=user&ice_credential=pass
    */
   virtual int Connect( const char* url, const char* usertoken ) = 0;
 
@@ -172,10 +193,10 @@ SHARERTCCLIENT_API void UnInitializeShareRTC();
 
 /**
  * @brief 创建 IShareRTCClient 实例
- * @param pSignal 信令连接对象指针（由调用者创建并管理生命周期，必须保持有效）
+ * @param factory 信令 socket 工厂，SDK 通过它创建并接管 ISignalSocket
  * @return 成功返回对象指针，失败返回 nullptr
  */
-SHARERTCCLIENT_API IShareRTCClient* CreateShareRTCClient( ISignalSocket* sock );
+SHARERTCCLIENT_API IShareRTCClient* CreateShareRTCClient( IWebSocketFactory* factory );
 
 /**
  * @brief 销毁 IShareRTCClient 实例
@@ -185,10 +206,10 @@ SHARERTCCLIENT_API void DestroyShareRTCClient(IShareRTCClient* p);
 
 /**
  * @brief 创建 IShareRTCControl 实例
- * @param pSignal 信令连接对象指针（由调用者创建并管理生命周期，必须保持有效）
+ * @param factory 信令 socket 工厂，SDK 通过它创建并接管 ISignalSocket
  * @return 成功返回对象指针，失败返回 nullptr
  */
-SHARERTCCLIENT_API IShareRTCControl* CreateShareRTCControl( ISignalSocket* sock );
+SHARERTCCLIENT_API IShareRTCControl* CreateShareRTCControl( IWebSocketFactory* factory );
 
 /**
  * @brief 销毁 IShareRTCControl 实例

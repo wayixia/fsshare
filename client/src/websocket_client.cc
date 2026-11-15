@@ -10,7 +10,7 @@
 
 
 
-struct WebSocketClient::Impl {
+struct WebSocketClient::Impl : public std::enable_shared_from_this<Impl> {
   Impl(SimpleThread* t);
   ~Impl();
 
@@ -30,12 +30,13 @@ struct WebSocketClient::Impl {
   struct lws* wsi = nullptr;
 
   int retry_counter = 0;
-  bool exiting = false;
+  std::atomic<bool> exiting{false};
 
   WebSocketClient* outer = nullptr;
   SimpleThread* net_thread_;
 
-  WsClientState state = WsClientState::kDisconnected;
+  // Read by isConnected() from arbitrary threads.
+  std::atomic<WsClientState> state{WsClientState::kDisconnected};
 
   void SetState(WsClientState s);
   void Log(const char* fmt, ...);
@@ -50,7 +51,7 @@ struct WebSocketClient::Impl {
 };
 
 WebSocketClient::WebSocketClient(SimpleThread* net_thread)
-  : impl_(std::make_unique<Impl>(net_thread))
+  : impl_(std::make_shared<Impl>(net_thread))
   , net_thread_(net_thread) {
   impl_->outer = this;
   
@@ -58,7 +59,28 @@ WebSocketClient::WebSocketClient(SimpleThread* net_thread)
 }
 
 WebSocketClient::~WebSocketClient() {
-  Close();
+  shutting_down_ = true;
+  if (!impl_) {
+    return;
+  }
+  // Stop queued tasks (reconnect timers, evt loops) from starting new work.
+  impl_->exiting = true;
+  if (net_thread_) {
+    if (net_thread_->IsCurrent()) {
+      DoClose();
+    } else if (net_thread_->IsRunning()) {
+      // The SDK may destroy the socket from any thread; libwebsockets must be
+      // serviced from its own thread.
+      net_thread_->Invoke([this] { DoClose(); }).wait();
+    } else {
+      // The network thread is already stopped so there is no concurrent access.
+      DoClose();
+    }
+  } else {
+    DoClose();
+  }
+  // Expire the weak_ptr held by any still queued task.
+  impl_.reset();
 }
 
 void WebSocketClient::SetConfig(const WsClientConfig& cfg) {
@@ -67,15 +89,29 @@ void WebSocketClient::SetConfig(const WsClientConfig& cfg) {
 }
 
 
-bool WebSocketClient::ConnectUrl(const std::string& url, const std::string& token ) {
-  net_thread_->PostTask([this,url, token]{
-    DoConnectUrl(url, token);
+bool WebSocketClient::ConnectUrl(const std::string& url, const std::string& token) {
+  if (!impl_ || !net_thread_) {
+    return false;
+  }
+  std::weak_ptr<Impl> weak_impl = impl_;
+  net_thread_->PostTask([weak_impl, url, token] {
+    auto impl = weak_impl.lock();
+    if (!impl || impl->outer->shutting_down_) {
+      return;
+    }
+    // A user may reconnect after disconnect(); DoConnectUrl clears exiting.
+    if (impl->outer->DoConnectUrl(url, token)) {
+      impl->Start();
+    }
   });
-  impl_->Start();
+  return true;
 }
 
 bool WebSocketClient::DoConnectUrl(const std::string& url, const std::string& token) {
   //RTC_DCHECK_RUN_ON(net_thread_);
+  // Remember the connection parameters so TryReconnect() can reuse them.
+  impl_->url_ = url;
+  impl_->token_ = token;
   if (!impl_->ParseUrl(url)) {
     OnError(-100);
     return false;
@@ -145,6 +181,10 @@ bool WebSocketClient::DoConnectUrl(const std::string& url, const std::string& to
 
 void WebSocketClient::Close() {
   DCHECK_RUN_ON(net_thread_);
+  DoClose();
+}
+
+void WebSocketClient::DoClose() {
   impl_->exiting = true;
   if (impl_->wsi) {
     lws_close_reason(impl_->wsi, LWS_CLOSE_STATUS_NORMAL, nullptr,0);
@@ -158,6 +198,26 @@ void WebSocketClient::Close() {
 }
 
 bool WebSocketClient::SendText(const std::string& text) {
+  if (!impl_ || !net_thread_) {
+    return false;
+  }
+  if (net_thread_->IsCurrent()) {
+    return DoSendText(text);
+  }
+  // Called from another thread (e.g. the WebRTC signaling thread); libwebsockets
+  // requires writes on the thread that services the context.
+  std::weak_ptr<Impl> weak_impl = impl_;
+  net_thread_->PostTask([weak_impl, text] {
+    auto impl = weak_impl.lock();
+    if (!impl || impl->exiting || impl->outer->shutting_down_) {
+      return;
+    }
+    impl->outer->DoSendText(text);
+  });
+  return true;
+}
+
+bool WebSocketClient::DoSendText(const std::string& text) {
   DCHECK_RUN_ON(net_thread_);
   if(impl_->state != WsClientState::kOpen || !impl_->wsi)
     return false;
@@ -170,6 +230,26 @@ bool WebSocketClient::SendText(const std::string& text) {
 }
 
 bool WebSocketClient::SendBinary(const uint8_t* data, size_t len) {
+  if (!impl_ || !net_thread_) {
+    return false;
+  }
+  if (net_thread_->IsCurrent()) {
+    return DoSendBinary(data, len);
+  }
+  // C++11: copy into a shared_ptr so the posted task can own the data.
+  auto buffer = std::make_shared<std::vector<uint8_t>>(data, data + len);
+  std::weak_ptr<Impl> weak_impl = impl_;
+  net_thread_->PostTask([weak_impl, buffer] {
+    auto impl = weak_impl.lock();
+    if (!impl || impl->exiting || impl->outer->shutting_down_) {
+      return;
+    }
+    impl->outer->DoSendBinary(buffer->data(), buffer->size());
+  });
+  return true;
+}
+
+bool WebSocketClient::DoSendBinary(const uint8_t* data, size_t len) {
   DCHECK_RUN_ON(net_thread_);
   if(impl_->state != WsClientState::kOpen || !impl_->wsi) return false;
   size_t buf_len = LWS_PRE + len;
@@ -183,6 +263,9 @@ bool WebSocketClient::SendBinary(const uint8_t* data, size_t len) {
 
 void WebSocketClient::OnStateChange(WsClientState state)
 {
+  if (!observer_) {
+    return;
+  }
   if( state == WsClientState::kOpen )
   {
     observer_->onConnected();
@@ -195,17 +278,23 @@ void WebSocketClient::OnStateChange(WsClientState state)
 
 void WebSocketClient::OnTextMessage(const uint8_t* data, size_t size)
 {
-  observer_->onDataReceived( data, size );
+  if (observer_) {
+    observer_->onDataReceived( data, size );
+  }
 }
 
 void WebSocketClient::OnBinaryMessage(const uint8_t* data, size_t size)
 {
-  observer_->onDataReceived( data, size );
+  if (observer_) {
+    observer_->onDataReceived( data, size );
+  }
 }
 
 void WebSocketClient::OnError(int err)
 {
-  observer_->onError(err, "");
+  if (observer_) {
+    observer_->onError(err, "");
+  }
 }
 
 // Impl 实现
@@ -219,24 +308,43 @@ WebSocketClient::Impl::~Impl() {
 
 void WebSocketClient::Impl::Start()
 {
-  net_thread_->PostDelayedTask([this](){ EvtLoop(); }, 0);
+  if (exiting) {
+    return;
+  }
+  std::weak_ptr<Impl> weak = shared_from_this();
+  net_thread_->PostDelayedTask([weak]() {
+    auto impl = weak.lock();
+    if (impl && !impl->exiting && impl->context) {
+      impl->EvtLoop();
+    }
+  }, 0);
 }
 
 void WebSocketClient::Impl::EvtLoop() {
-  if (exiting) 
-  {
+  if (exiting || !context) {
     return;
   }
   lws_service(context, 20);
-  net_thread_->PostDelayedTask([this](){ EvtLoop(); }, 0);
+  std::weak_ptr<Impl> weak = shared_from_this();
+  net_thread_->PostDelayedTask([weak]() {
+    auto impl = weak.lock();
+    if (impl && !impl->exiting && impl->context) {
+      impl->EvtLoop();
+    }
+  }, 0);
 }
 
 void WebSocketClient::Impl::SetState(WsClientState s) {
   if(state == s) return;
   state = s;
-  outer->net_thread_->PostTask([this,s](){
-   //if(outer->on_state_change) outer->on_state_change(s);
-    outer->OnStateChange(s);
+  // Do not dereference `outer` later when it is being destroyed.
+  if (outer->shutting_down_) return;
+  std::weak_ptr<Impl> weak = shared_from_this();
+  net_thread_->PostTask([weak,s](){
+    auto impl = weak.lock();
+    if (impl && !impl->outer->shutting_down_) {
+      impl->outer->OnStateChange(s);
+    }
   });
 }
 
@@ -303,18 +411,22 @@ std::vector<std::string> WebSocketClient::Impl::build_custom_headers() {
 
 void WebSocketClient::Impl::TryReconnect() {
   if(exiting) return;
+  std::weak_ptr<Impl> weak = shared_from_this();
   if(retry_counter >= config.max_retry_count){
     Log("max retry reached");
-    net_thread_->PostTask([this](){
-     //if(outer->on_error) outer->on_error(-2);
-      outer->OnError(-2);
+    net_thread_->PostTask([weak](){
+      auto impl = weak.lock();
+      if (!impl || impl->exiting || impl->outer->shutting_down_) return;
+      impl->outer->OnError(-2);
     });
     return;
   }
   retry_counter++;
   Log("schedule reconnect try=%d delay=%dms", retry_counter, config.retry_delay_ms);
-  net_thread_->PostDelayedTask([this](){
-    outer->ConnectUrl(url_, token_);
+  net_thread_->PostDelayedTask([weak](){
+    auto impl = weak.lock();
+    if (!impl || impl->exiting || impl->outer->shutting_down_) return;
+    impl->outer->ConnectUrl(impl->url_, impl->token_);
   }, config.retry_delay_ms);
 }
 
@@ -340,28 +452,20 @@ int WebSocketClient::Impl::LwsCallback(struct lws *wsi, enum lws_callback_reason
     impl->msg_buf.insert(impl->msg_buf.end(),(uint8_t*)in, ((uint8_t*)in)+len);
 
     if(is_fin) {
-      // 完整消息
-      if(impl->msg_opcode == 0x1) {
-        // TEXT消息
-        impl->net_thread_->PostTask([impl](){
-//          if(impl->outer->on_text_msg) {
-//            impl->outer->on_text_msg(
-//              std::string((const char*)impl->msg_buf.data(), impl->msg_buf.size()));
-//          }
-          
-          impl->outer->OnTextMessage( impl->msg_buf.data(), impl->msg_buf.size());
-          impl->msg_buf.clear();
-        });
-      } else if(impl->msg_opcode == 0x2) {
-        // BINARY消息
-        impl->net_thread_->PostTask([impl](){
-//          if(impl->outer->on_binary_msg) {
-//            impl->outer->on_binary_msg(impl->msg_buf.data(), impl->msg_buf.size());
-//          }
-            impl->outer->OnBinaryMessage(impl->msg_buf.data(), impl->msg_buf.size());
-          impl->msg_buf.clear();
-        });
-      }
+      // 完整消息：拷贝一份 payload，避免延迟任务读取被后续消息覆盖的缓冲区。
+      const uint8_t opcode_value = impl->msg_opcode;
+      const std::vector<uint8_t> payload = impl->msg_buf;
+      impl->msg_buf.clear();
+      std::weak_ptr<Impl> weak = impl->shared_from_this();
+      impl->net_thread_->PostTask([weak, opcode_value, payload](){
+        auto impl = weak.lock();
+        if (!impl || impl->outer->shutting_down_) return;
+        if (opcode_value == 0x1) {
+          impl->outer->OnTextMessage(payload.data(), payload.size());
+        } else if (opcode_value == 0x2) {
+          impl->outer->OnBinaryMessage(payload.data(), payload.size());
+        }
+      });
     }
     break;
   }
@@ -421,7 +525,19 @@ bool WebSocketClient::connect(  const char* url, const char* token ) {
 
 
 void WebSocketClient::disconnect()  {
-  Close();
+  if (!impl_ || !net_thread_) {
+    return;
+  }
+  if (net_thread_->IsCurrent()) {
+    Close();
+    return;
+  }
+  std::weak_ptr<Impl> weak = impl_;
+  net_thread_->PostTask([weak] {
+    auto impl = weak.lock();
+    if (!impl || impl->outer->shutting_down_) return;
+    impl->outer->Close();
+  });
 }
 
 bool WebSocketClient::send(const uint8_t* data, size_t len)  {
@@ -430,6 +546,6 @@ bool WebSocketClient::send(const uint8_t* data, size_t len)  {
 
 
 bool WebSocketClient::isConnected() const {
-  return ( impl_->state == WsClientState::kOpen );
+  return impl_ && impl_->state == WsClientState::kOpen;
 }
 
