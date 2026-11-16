@@ -54,20 +54,36 @@ target_link_libraries(FSShareClient PRIVATE websockets )
 # 如果没有任何外部依赖，上面的链接部分可以留空
 # 但你的 websocket_client 实现很可能依赖某个库，请按需启用并修改
 
-#set_target_properties(FSShareClient PROPERTIES
-#    INSTALL_RPATH "@loader_path/../../../../out/Debug"
-#)
+# ============================================
+# sharertc SDK（外部已编译好的动态库）
+# ============================================
+# 外部指定的动态库路径。链接和运行时都使用这个路径。
+set(SHARERTC_SDK_PATH
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../out/Debug/libsharertc_sdk.dylib")
 
 add_library(sharertc_sdk SHARED IMPORTED)
-set_target_properties( sharertc_sdk PROPERTIES
-    IMPORTED_LOCATION "${CMAKE_CURRENT_SOURCE_DIR}/../../out/Debug/libsharertc_sdk.dylib"
+set_target_properties(sharertc_sdk PROPERTIES
+    IMPORTED_LOCATION "${SHARERTC_SDK_PATH}"
 )
 
 target_link_libraries(FSShareClient PRIVATE sharertc_sdk)
 
-add_custom_command(TARGET FSShareClient POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        $<TARGET_FILE:sharertc_sdk>
-        $<TARGET_FILE_DIR:FSShareClient>
-    COMMENT "Copy sharertc_sdk to FSShareClient output directory"
-)
+if(APPLE)
+    get_filename_component(SHARERTC_SDK_DIR "${SHARERTC_SDK_PATH}" DIRECTORY)
+
+    # SDK 的 install_name 已经是 @rpath/libsharertc_sdk.dylib（见
+    # sharertc/BUILD.gn），这里只需提供 rpath：
+    #   - SDK 所在目录：运行时加载链接时指定的同一个外部动态库；
+    #   - @loader_path：库被拷贝到可执行文件目录时也能找到。
+    set_target_properties(FSShareClient PROPERTIES
+        BUILD_RPATH "${SHARERTC_SDK_DIR};@loader_path"
+    )
+
+    # 同时拷贝一份到可执行文件目录，配合 @loader_path 使用。
+    add_custom_command(TARGET FSShareClient POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "$<TARGET_FILE:sharertc_sdk>"
+            "$<TARGET_FILE_DIR:FSShareClient>"
+        COMMENT "Copy libsharertc_sdk.dylib next to FSShareClient"
+    )
+endif()

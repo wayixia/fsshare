@@ -54,6 +54,13 @@ rtc_library("read_auth_file") {
 
 
 if (is_linux || is_chromeos || is_win || is_mac) {
+  # 让 sharertc_sdk 的调试信息记录绝对编译目录，便于其他工程调试。
+  config("sharertc_absolute_debug_info") {
+    if (is_mac) {
+      cflags = [ "-ffile-compilation-dir=" + rebase_path(root_build_dir, "") ]
+    }
+  }
+
   if (is_linux || is_chromeos) {
     pkg_config("gtk_config") {
       packages = [
@@ -69,8 +76,22 @@ if (is_linux || is_chromeos || is_win || is_mac) {
   rtc_shared_library("sharertc_sdk") {
     #testonly = true
     # defines += [ "WEBRTC_CHROMIUM_BUILD" ]
-    
+
     defines = ["SHARERTCCLIENT_EXPORTS"]
+    if (is_mac) {
+      # 默认的 install_name 是相对路径 "./libsharertc_sdk.dylib"，dyld 会
+      # 相对当前工作目录解析，导致使用方从其他目录启动时找不到动态库。
+      # 设置成 @rpath 后，由使用方的 rpath 决定运行时的加载路径。
+      ldflags = [ "-Wl,-install_name,@rpath/libsharertc_sdk.dylib" ]
+
+      # WebRTC 默认用 -ffile-compilation-dir=. 生成可复现的调试信息，
+      # DW_AT_comp_dir 是相对路径 "."。当 dylib 被其他工程（例如
+      # sharertc/client）加载调试时，调试器无法把 ../../sharertc/... 解析
+      # 成真实路径，会显示 /../../sharertc/... 不存在。
+      # 这里通过一个 config 把 SDK 的编译目录写成绝对路径（config 会排在
+      # 默认 config 之后，覆盖全局的 -ffile-compilation-dir=.）。
+      configs += [ ":sharertc_absolute_debug_info" ]
+    }
     include_dirs = [
       "deps/include"
     ]
