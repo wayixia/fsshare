@@ -50,15 +50,22 @@ void PrintUsage(const char* argv0) {
             << std::endl;
 }
 
-void PrintCommands() {
-  std::cout << "\nCommand List:\n"
+void PrintClientCommands() {
+  std::cout << "\nCommand List (rtc client):\n"
             << "help: Display this help text\n"
             << "quit: Exit the program\n"
-            << "login <url> <token>\n"
-            << "    client:  login ws://host:port/signalingserver <token>\n"
-            << "    control: login https://host:port/<peerid> <token>\n"
+            << "login <url> <token>: login ws://host:port/signalingserver\n"
             << "logout: Disconnect from the signaling server\n"
-            << "send <text>: Send text on the 'data' channel (control only)\n"
+            << std::endl;
+}
+
+void PrintControlCommands() {
+  std::cout << "\nCommand List (rtc control):\n"
+            << "help: Display this help text\n"
+            << "quit: Exit the program\n"
+            << "login <url> <token>: login https://host:port/<peerid>\n"
+            << "logout: Disconnect from the peer and the signaling server\n"
+            << "send <text>: Send text on the 'data' channel\n"
             << std::endl;
 }
 
@@ -100,12 +107,10 @@ std::string TrimLeft(std::string text) {
 
 }  // namespace
 
-int main(int argc, char** argv) {
-  EndpointType type;
-  if (!ParseEndpointType(argc, argv, &type)) {
-    PrintUsage(argv[0]);
-    return 1;
-  }
+// rtc 信令客户端：登录信令服务器，等待 control 端发起 Offer。
+int main_rtcclient(int argc, char** argv) {
+  (void)argc;
+  (void)argv;
 
   WebSocketClient::Initialize();
 
@@ -113,26 +118,16 @@ int main(int argc, char** argv) {
   net_thread.Start();
 
   WebSocketFactory factory(&net_thread);
-  ConsoleChannelObserver channel_observer;
-  IShareRTCClient* client = nullptr;
-  IShareRTCControl* control = nullptr;
-  int channel_id = 0;
-
-  if (type == EndpointType::kClient) {
-    client = CreateShareRTCClient(&factory);
-  } else {
-    control = CreateShareRTCControl(&factory);
-    if (control) {
-      control->SetObserver(&channel_observer);
-    }
-  }
-  if (!client && !control) {
-    std::cout << "Failed to create ShareRTC object" << std::endl;
+  IShareRTCClient* client = CreateShareRTCClient(&factory);
+  if (!client) {
+    std::cout << "Failed to create ShareRTC client" << std::endl;
+    net_thread.Stop();
+    WebSocketClient::Uninitialize();
     return 1;
   }
 
-  std::cout << "ShareRTC " << (client ? "client" : "control")
-            << " started. Type 'help' for commands." << std::endl;
+  std::cout << "ShareRTC client started. Type 'help' for commands."
+            << std::endl;
 
   std::string line;
   while (std::getline(std::cin, line)) {
@@ -145,7 +140,7 @@ int main(int argc, char** argv) {
     if (command == "quit" || command == "exit") {
       break;
     } else if (command == "help") {
-      PrintCommands();
+      PrintClientCommands();
     } else if (command == "login") {
       std::string url;
       std::string token;
@@ -153,28 +148,85 @@ int main(int argc, char** argv) {
         std::cout << "Usage: login <url> <token>" << std::endl;
         continue;
       }
-      if (client) {
-        client->Login(url.c_str(), token.c_str());
-        std::cout << "login: " << url << std::endl;
+      client->Login(url.c_str(), token.c_str());
+      std::cout << "login: " << url << std::endl;
+    } else if (command == "logout") {
+      client->Logout();
+      std::cout << "logout" << std::endl;
+    } else if (command == "send") {
+      std::cout << "send is only supported for control endpoints"
+                << std::endl;
+    } else {
+      std::cout << "Unrecognized Command: " << command << std::endl;
+    }
+  }
+
+  client->Logout();
+  DestroyShareRTCClient(client);
+  // The network thread must outlive the socket, which is owned (and
+  // destroyed) by the ShareRTC object above.
+  net_thread.Stop();
+  WebSocketClient::Uninitialize();
+  return 0;
+}
+
+// rtc 连接控制端：解析 https://signalserver:port/peerid，向目标 peer 发起连接。
+int main_rtccontrol(int argc, char** argv) {
+  (void)argc;
+  (void)argv;
+
+  WebSocketClient::Initialize();
+
+  SimpleThread net_thread("WebSocketNetThread");
+  net_thread.Start();
+
+  WebSocketFactory factory(&net_thread);
+  ConsoleChannelObserver channel_observer;
+  IShareRTCControl* control = CreateShareRTCControl(&factory);
+  if (!control) {
+    std::cout << "Failed to create ShareRTC control" << std::endl;
+    net_thread.Stop();
+    WebSocketClient::Uninitialize();
+    return 1;
+  }
+  control->SetObserver(&channel_observer);
+
+  std::cout << "ShareRTC control started. Type 'help' for commands."
+            << std::endl;
+
+  int channel_id = 0;
+  std::string line;
+  while (std::getline(std::cin, line)) {
+    std::istringstream iss(line);
+    std::string command;
+    if (!(iss >> command)) {
+      continue;
+    }
+
+    if (command == "quit" || command == "exit") {
+      break;
+    } else if (command == "help") {
+      PrintControlCommands();
+    } else if (command == "login") {
+      std::string url;
+      std::string token;
+      if (!(iss >> url >> token)) {
+        std::cout << "Usage: login <url> <token>" << std::endl;
+        continue;
+      }
+      if (channel_id <= 0) {
+        channel_id = control->CreateChannel("data", &channel_observer);
+      }
+      const int rc = control->Connect(url.c_str(), token.c_str());
+      if (rc == 0) {
+        std::cout << "login: " << url << " (channel " << channel_id << ")"
+                  << std::endl;
       } else {
-        if (channel_id <= 0) {
-          channel_id = control->CreateChannel("data", &channel_observer);
-        }
-        const int rc = control->Connect(url.c_str(), token.c_str());
-        if (rc == 0) {
-          std::cout << "login: " << url << " (channel " << channel_id << ")"
-                    << std::endl;
-        } else {
-          std::cout << "login failed, code " << rc << std::endl;
-        }
+        std::cout << "login failed, code " << rc << std::endl;
       }
     } else if (command == "logout") {
-      if (client) {
-        client->Logout();
-      } else {
-        control->Disconnect();
-        channel_id = 0;
-      }
+      control->Disconnect();
+      channel_id = 0;
       std::cout << "logout" << std::endl;
     } else if (command == "send") {
       std::string text;
@@ -182,11 +234,6 @@ int main(int argc, char** argv) {
       text = TrimLeft(std::move(text));
       if (text.empty()) {
         std::cout << "Usage: send <text>" << std::endl;
-        continue;
-      }
-      if (!control) {
-        std::cout << "send is only supported for control endpoints"
-                  << std::endl;
         continue;
       }
       if (channel_id <= 0) {
@@ -206,17 +253,25 @@ int main(int argc, char** argv) {
     }
   }
 
-  if (control) {
-    control->Disconnect();
-    DestroyShareRTCControl(control);
-  }
-  if (client) {
-    client->Logout();
-    DestroyShareRTCClient(client);
-  }
-  // The network thread must outlive the sockets, which are owned (and
-  // destroyed) by the ShareRTC objects above.
+  control->Disconnect();
+  DestroyShareRTCControl(control);
   net_thread.Stop();
   WebSocketClient::Uninitialize();
   return 0;
+}
+
+int main(int argc, char** argv) {
+  EndpointType type;
+  if (!ParseEndpointType(argc, argv, &type)) {
+    PrintUsage(argv[0]);
+    return 1;
+  }
+
+  switch (type) {
+    case EndpointType::kClient:
+      return main_rtcclient(argc, argv);
+    case EndpointType::kControl:
+      return main_rtccontrol(argc, argv);
+  }
+  return 1;
 }
